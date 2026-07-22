@@ -165,7 +165,17 @@ def me():
 @app.route("/api/students", methods=["GET"])
 @login_required(roles=["admin", "teacher", "analyst"])
 def get_students():
-    students = db.list_students()
+    search_query = (request.args.get("search") or request.args.get("query") or "").strip()
+    if search_query:
+        filter_query = {
+            "$or": [
+                {"student_id": {"$regex": search_query, "$options": "i"}},
+                {"full_name": {"$regex": search_query, "$options": "i"}},
+            ]
+        }
+        students = db.list_students(filter_query=filter_query, limit=None)
+    else:
+        students = db.list_students(limit=50)
     return jsonify({"students": students, "count": len(students)}), 200
 
 

@@ -929,13 +929,18 @@ function TeacherView() {
   const [result, setResult] = useState(null);
   const [predictError, setPredictError] = useState("");
 
-  function load() {
+  const load = useCallback((query = "") => {
     setError("");
-    apiGet("/students").then(d => setStudents(d.students || [])).catch(e => setError(e.message || "Couldn't load the class roster."));
-  }
-  useEffect(load, []);
+    const endpoint = query ? `/students?search=${encodeURIComponent(query)}` : "/students";
+    apiGet(endpoint).then(d => setStudents(d.students || [])).catch(e => setError(e.message || "Couldn't load the class roster."));
+  }, []);
 
-  const filtered = (students || []).filter(s => s.student_id.toLowerCase().includes(search.toLowerCase()));
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      load(search.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [load, search]);
 
   const runPrediction = useCallback(async (s) => {
     setPredicting(s.student_id);
@@ -985,7 +990,7 @@ function TeacherView() {
               <div className="ep-roster-col-hide">Score</div>
               <div>Action</div>
             </div>
-            {filtered.map(s => (
+            {(students || []).map(s => (
               <div key={s.student_id} className="ep-roster-row ep-row-hover" style={{ padding: "9px 4px", borderBottom: `1px solid ${COLORS.line}`, fontSize: 13.5, minWidth: 340 }}>
                 <div style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{s.student_id}</div>
                 <div className="ep-roster-col-hide" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{s.attendance_rate ?? "—"}%</div>
