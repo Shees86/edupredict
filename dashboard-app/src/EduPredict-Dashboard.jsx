@@ -827,6 +827,7 @@ function AdminView() {
   const [students, setStudents] = useState(null);
   const [sysStats, setSysStats] = useState(null);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
 
   function load() {
     setError("");
@@ -837,12 +838,24 @@ function AdminView() {
     ]).then(([summaryRes, alertsRes, studentsRes]) => {
       setSummary(summaryRes);
       setAlerts(alertsRes.alerts || []);
-      setStudents((studentsRes.students || []).slice(0, 8));
+      setStudents(studentsRes.students || []);
     }).catch(e => setError(e.message || "Couldn't load dashboard data."));
     apiGet("/system/stats").then(setSysStats).catch(() => {}); // non-critical, fail silently
   }
 
+  const loadStudents = useCallback((query = "") => {
+    const endpoint = query ? `/students?search=${encodeURIComponent(query)}` : "/students";
+    apiGet(endpoint).then(d => setStudents(d.students || [])).catch(e => setError(e.message || "Couldn't load the class roster."));
+  }, []);
+
   useEffect(load, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      loadStudents(search.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [loadStudents, search]);
 
   if (error) return <div className="ep-page"><ErrorNote message={error} onRetry={load} /></div>;
   if (!summary || !alerts || !students) return <div className="ep-page"><LoadingNote>Loading system overview…</LoadingNote></div>;
@@ -911,6 +924,15 @@ function AdminView() {
       <div style={{ marginTop: 32 }}>
         <SectionLabel icon={Users}>Student Register (latest)</SectionLabel>
         <CsvUploadWidget onUploaded={load} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 18px", maxWidth: 320 }}>
+          <Search size={14} color={COLORS.muted} />
+          <input
+            placeholder="Search student ID…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ border: "none", borderBottom: `1px solid ${COLORS.line}`, background: "transparent", padding: "6px 4px", fontSize: 13, width: "100%", fontFamily: "'IBM Plex Sans', sans-serif" }}
+          />
+        </div>
         {students.length === 0 ? (
           <p style={{ fontSize: 12.5, color: COLORS.muted }}>No students registered yet.</p>
         ) : (
