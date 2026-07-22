@@ -89,26 +89,18 @@ def register():
         if existing_user:
             return jsonify({"error": "An account has already been registered/claimed for this Student ID."}), 400
 
+        result = db.users_col.insert_one({
+            "username": username,
+            "password_hash": db.generate_password_hash(password),
+            "role": role,
+            "full_name": full_name,
+            "created_at": db.datetime.utcnow(),
+        })
+        return jsonify({"message": "User created", "user_id": str(result.inserted_id)}), 201
+
     user_id, err = db.create_user(username, password, role, full_name)
     if err:
         return jsonify({"error": err}), 409
-    if role == "student":
-        db.upsert_student({
-            "student_id": username,
-            "full_name": full_name or username,
-            "age": 18,
-            "attendance_rate": 0,
-            "avg_test_score": 0,
-            "assignments_submitted_pct": 0,
-            "study_hours_per_week": 0,
-            "previous_semester_gpa": 0.0,
-            "lms_login_frequency_per_week": 0,
-            "gender": "Unknown",
-            "family_income_level": "Medium",
-            "parental_education": "Secondary",
-            "extracurricular": "No",
-            "dropout_risk": 0,
-        })
     return jsonify({"message": "User created", "user_id": user_id}), 201
 
 
