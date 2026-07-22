@@ -278,6 +278,7 @@ function CsvUploadWidget({ onUploaded }) {
 
 export default function EduPredictDashboard() {
   const [user, setUser] = useState(null);
+  const [view, setView] = useState("landing"); // "landing" | "login" | "register"
   const liveAlert = useLiveAlerts(!!user && ["admin", "teacher", "analyst"].includes(user?.role));
   const [dismissedAlert, setDismissedAlert] = useState(null);
 
@@ -285,7 +286,11 @@ export default function EduPredictDashboard() {
     return (
       <>
         <style>{FONT_IMPORT}{GLOBAL_CSS}</style>
-        <LoginScreen onLogin={setUser} />
+        {view === "landing" ? (
+          <LandingPage onLogin={() => setView("login")} onSignup={() => setView("register")} />
+        ) : (
+          <LoginScreen onLogin={setUser} initialMode={view} onBack={() => setView("landing")} />
+        )}
       </>
     );
   }
@@ -296,7 +301,7 @@ export default function EduPredictDashboard() {
     <>
       <style>{FONT_IMPORT}{GLOBAL_CSS}</style>
       <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", background: COLORS.paper, minHeight: "600px", color: COLORS.text }}>
-        <TopBar user={user} onLogout={() => setUser(null)} />
+        <TopBar user={user} onLogout={() => { setUser(null); setView("landing"); }} />
         {showBanner && <LiveAlertBanner alert={liveAlert} onDismiss={() => setDismissedAlert(liveAlert)} />}
         <div className="ep-shell">
           <RoleView role={user.role} user={user} />
@@ -307,8 +312,100 @@ export default function EduPredictDashboard() {
   );
 }
 
-function LoginScreen({ onLogin }) {
-  const [mode, setMode] = useState("login");
+/* ---------------- Landing Page ---------------- */
+function LandingPage({ onLogin, onSignup }) {
+  const features = [
+    { icon: AlertTriangle, title: "Dropout Risk Detection", text: "Trained ML model flags at-risk students early from attendance, scores, and engagement." },
+    { icon: GraduationCap, title: "Career Pathway Predictors", text: "Matric/intermediate percentage tools recommend fields, colleges, universities, and CGPA trend." },
+    { icon: Bell, title: "Real-Time Alerts", text: "Live, role-based notifications the moment a student is flagged — no page refresh needed." },
+    { icon: LineIcon, title: "Cohort Analytics", text: "Correlation analysis and model metrics for institution-wide, data-driven decisions." },
+  ];
+
+  return (
+    <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", background: COLORS.paper, minHeight: "600px", color: COLORS.text }}>
+      {/* Nav */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12,
+        padding: "18px 32px", background: COLORS.ink, borderBottom: `3px solid ${COLORS.brass}`,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className="ep-logo-mark">E</div>
+          <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 19, color: "#F4F1E9" }}>EduPredict</span>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onLogin} className="ep-btn" style={{
+            padding: "8px 16px", background: "none", border: `1px solid ${COLORS.inkSoft}`, color: "#F4F1E9",
+            fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'IBM Plex Sans', sans-serif",
+          }}>
+            Log in
+          </button>
+          <button onClick={onSignup} className="ep-btn ep-btn-primary" style={{
+            padding: "8px 16px", background: COLORS.brass, border: "none", color: "#16233F",
+            fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'IBM Plex Sans', sans-serif",
+          }}>
+            Sign up
+          </button>
+        </div>
+      </div>
+
+      {/* Hero */}
+      <div className="ep-page ep-stagger" style={{ textAlign: "center", maxWidth: 720, margin: "0 auto", paddingTop: 64, paddingBottom: 48 }}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 13, letterSpacing: "0.2em", color: COLORS.brass, textTransform: "uppercase", marginBottom: 12 }}>
+          Academic Analytics Portal
+        </div>
+        <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: "clamp(32px, 5vw, 52px)", color: COLORS.ink, lineHeight: 1.15, margin: "0 0 18px" }}>
+          Spot at-risk students before it's too late.
+        </h1>
+        <p style={{ fontSize: 16, color: COLORS.muted, lineHeight: 1.6, margin: "0 0 32px" }}>
+          EduPredict combines Hadoop-scale data processing with machine learning to
+          predict dropout risk, recommend academic pathways, and give every
+          stakeholder — admin, teacher, student, analyst — the view they need.
+        </p>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+          <button onClick={onSignup} className="ep-btn ep-btn-primary" style={{
+            padding: "12px 28px", background: COLORS.brass, border: "none", color: "#16233F",
+            fontSize: 14.5, fontWeight: 600, cursor: "pointer", fontFamily: "'IBM Plex Sans', sans-serif",
+          }}>
+            Get Started
+          </button>
+          <button onClick={onLogin} className="ep-btn" style={{
+            padding: "12px 28px", background: "none", border: `1px solid ${COLORS.line}`, color: COLORS.ink,
+            fontSize: 14.5, fontWeight: 600, cursor: "pointer", fontFamily: "'IBM Plex Sans', sans-serif",
+          }}>
+            I already have an account
+          </button>
+        </div>
+      </div>
+
+      {/* Features */}
+      <div className="ep-page" style={{ maxWidth: 1000, margin: "0 auto", paddingTop: 0 }}>
+        <div className="ep-stagger" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20 }}>
+          {features.map((f, i) => {
+            const Icon = f.icon;
+            return (
+              <div key={i} className="ep-card ep-card-hover" style={{ padding: 22 }}>
+                <Icon size={20} color={COLORS.brass} style={{ marginBottom: 10 }} />
+                <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 15.5, color: COLORS.ink, marginBottom: 6 }}>
+                  {f.title}
+                </div>
+                <div style={{ fontSize: 12.5, color: COLORS.muted, lineHeight: 1.55 }}>
+                  {f.text}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ textAlign: "center", padding: "40px 20px 60px", fontSize: 11.5, color: COLORS.muted }}>
+        Built on Hadoop/HDFS, PySpark, Flask, MongoDB, and React.
+      </div>
+    </div>
+  );
+}
+
+function LoginScreen({ onLogin, initialMode = "login", onBack }) {
+  const [mode, setMode] = useState(initialMode);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -397,6 +494,14 @@ function LoginScreen({ onLogin }) {
     }}>
       <div className="ep-login-texture" />
       <div style={{ width: "100%", maxWidth: 380, position: "relative" }}>
+        {onBack && (
+          <button onClick={onBack} className="ep-btn" style={{
+            display: "flex", alignItems: "center", gap: 6, background: "none", border: "none",
+            color: "#9AA7C2", fontSize: 12.5, cursor: "pointer", marginBottom: 18, fontFamily: "'IBM Plex Sans', sans-serif",
+          }}>
+            ← Back to home
+          </button>
+        )}
         <div className="ep-login-hero" style={{ textAlign: "center", marginBottom: 32 }}>
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
             <div className="ep-logo-mark" style={{ width: 44, height: 44, fontSize: 20 }}>E</div>
