@@ -629,6 +629,22 @@ const labelStyle = { display: "block", fontSize: 11, letterSpacing: "0.06em", te
 const inputStyle = { width: "100%", padding: "9px 10px", background: "#16233F", border: `1px solid ${COLORS.inkSoft}`, borderRadius: 3, color: "#F4F1E9", fontSize: 14, fontFamily: "'IBM Plex Mono', monospace", boxSizing: "border-box" };
 
 function TopBar({ user, onLogout }) {
+  const [displayName, setDisplayName] = useState(user?.full_name || user?.username || "");
+
+  useEffect(() => {
+    if (!user?.role || user.role !== "student") {
+      setDisplayName(user?.full_name || user?.username || "");
+      return;
+    }
+
+    setDisplayName(user?.full_name || user?.username || "");
+    apiGet(`/students/${user.username}`).then((record) => {
+      setDisplayName(record?.full_name || user?.full_name || user?.username || "");
+    }).catch(() => {
+      setDisplayName(user?.full_name || user?.username || "");
+    });
+  }, [user?.role, user?.username, user?.full_name]);
+
   return (
     <div className="ep-topbar" style={{
       padding: "16px 28px", background: COLORS.ink, color: "#F4F1E9",
@@ -642,7 +658,7 @@ function TopBar({ user, onLogout }) {
         </span>
       </div>
       <div className="ep-topbar-right">
-        <span className="ep-topbar-username" style={{ fontSize: 13, color: "#C9D0E0" }}>{user.full_name || user.username}</span>
+        <span className="ep-topbar-username" style={{ fontSize: 13, color: "#C9D0E0" }}>{displayName}</span>
         <button onClick={onLogout} className="ep-btn" style={{
           display: "flex", alignItems: "center", gap: 6, background: "none",
           border: `1px solid ${COLORS.inkSoft}`, color: "#C9D0E0", padding: "6px 10px",
