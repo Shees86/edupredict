@@ -564,8 +564,18 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
             </>
           )}
 
-          <label style={labelStyle}>Username</label>
-          <input value={username} onChange={e => setUsername(e.target.value)} placeholder={isRegister ? "Choose a username" : "Your username"} style={inputStyle} />
+          <label style={labelStyle}>{role === "student" ? "Student ID" : "Username"}</label>
+          <input
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            placeholder={role === "student" ? "e.g. ST0003 (from course roster)" : (isRegister ? "Choose a username" : "Your username")}
+            style={inputStyle}
+          />
+          {role === "student" && (
+            <div style={{ fontSize: 11.5, color: "#9AA7C2", marginTop: -8, marginBottom: 12, lineHeight: 1.45 }}>
+              Must match the Student ID provided in your institutional records.
+            </div>
+          )}
 
           <label style={labelStyle}>Password</label>
           <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={isRegister ? "Choose a password" : "••••••••"} style={inputStyle} />

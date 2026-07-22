@@ -81,6 +81,14 @@ def register():
     if len(password) < 6:
         return jsonify({"error": "Password must be at least 6 characters"}), 400
 
+    if role == "student":
+        student_record = db.students_col.find_one({"student_id": username}, {"_id": 0})
+        if not student_record:
+            return jsonify({"error": "Student ID not found in institutional records. Please verify with your faculty."}), 400
+        existing_user = db.users_col.find_one({"username": username})
+        if existing_user:
+            return jsonify({"error": "An account has already been registered/claimed for this Student ID."}), 400
+
     user_id, err = db.create_user(username, password, role, full_name)
     if err:
         return jsonify({"error": err}), 409
