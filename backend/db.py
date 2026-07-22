@@ -58,7 +58,7 @@ def get_student(student_id):
     return students_col.find_one({"student_id": student_id}, {"_id": 0})
 
 
-def list_students(filter_query=None, limit=50):
+def list_students(filter_query=None, limit=10):
     filter_query = filter_query or {}
     cursor = students_col.find(filter_query, {"_id": 0})
     if filter_query and (limit is None or limit == 0):

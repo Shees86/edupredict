@@ -175,7 +175,7 @@ def get_students():
         }
         students = db.list_students(filter_query=filter_query, limit=None)
     else:
-        students = db.list_students(limit=50)
+        students = db.list_students(limit=10)
     return jsonify({"students": students, "count": len(students)}), 200
 
 
