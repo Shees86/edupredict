@@ -1,0 +1,8 @@
+Flask==3.1.3
+flask-cors==4.0.0
+pymongo==4.8.0
+scikit-learn==1.8.0
+pandas==3.0.2
+numpy
+werkzeug
+gunicorn==22.0.0

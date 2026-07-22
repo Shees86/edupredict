@@ -1,0 +1,32 @@
+{
+  "recommended_field": {
+    "accuracy": 0.625,
+    "classes": [
+      "Arts/Humanities",
+      "Commerce",
+      "Computer Science",
+      "Pre-Engineering",
+      "Pre-Medical"
+    ],
+    "feature_importance": {
+      "matric_percentage": 0.7564,
+      "science_aptitude": 0.1864,
+      "extracurricular_score": 0.0491,
+      "city_tier": 0.0081
+    }
+  },
+  "college_tier": {
+    "accuracy": 0.7167,
+    "classes": [
+      "Mid-Tier College",
+      "Standard College",
+      "Top-Tier Government College"
+    ],
+    "feature_importance": {
+      "matric_percentage": 0.8863,
+      "science_aptitude": 0.0509,
+      "extracurricular_score": 0.0544,
+      "city_tier": 0.0084
+    }
+  }
+}
