@@ -380,6 +380,7 @@ export default function EduPredictDashboard() {
   const [lang, setLang] = useState(() => {
     try { return window.localStorage.getItem("ep-lang") || "en"; } catch { return "en"; }
   });
+  const [settingsOpen, setSettingsOpen] = useState(false);
   function toggleLang() {
     const next = lang === "en" ? "ur" : "en";
     setLang(next);
@@ -407,7 +408,6 @@ export default function EduPredictDashboard() {
   }
 
   const showBanner = liveAlert && liveAlert !== dismissedAlert;
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <>
