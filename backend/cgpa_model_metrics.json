@@ -1,0 +1,13 @@
+{
+  "mae": 0.1252,
+  "r2_score": 0.889,
+  "feature_importance": {
+    "attendance_rate": 0.0358,
+    "avg_test_score": 0.0849,
+    "assignments_submitted_pct": 0.0128,
+    "study_hours_per_week": 0.0086,
+    "previous_semester_gpa": 0.8535,
+    "lms_login_frequency_per_week": 0.0036,
+    "extracurricular": 0.0009
+  }
+}
