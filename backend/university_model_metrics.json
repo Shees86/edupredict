@@ -1,0 +1,32 @@
+{
+  "suggested_program": {
+    "accuracy": 0.595,
+    "classes": [
+      "Business Administration",
+      "Computer Science",
+      "Engineering",
+      "Medicine (MBBS)",
+      "Social Sciences"
+    ],
+    "feature_importance": {
+      "intermediate_percentage": 0.1684,
+      "entry_test_score": 0.1601,
+      "field": 0.6369,
+      "city_tier": 0.0346
+    }
+  },
+  "university_tier": {
+    "accuracy": 0.565,
+    "classes": [
+      "Mid-Tier Public University",
+      "Private University",
+      "Top Public University"
+    ],
+    "feature_importance": {
+      "intermediate_percentage": 0.44,
+      "entry_test_score": 0.4825,
+      "field": 0.0441,
+      "city_tier": 0.0335
+    }
+  }
+}
