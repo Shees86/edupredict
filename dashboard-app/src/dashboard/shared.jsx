@@ -27,6 +27,12 @@ export const LIGHT_COLORS = {
   paper: "#EDF1F0",
   paperDim: "#E1E6E3",
   brass: "#B8862E",
+  // Darker brass, used specifically where brass is the TEXT color on
+  // a light (paper/card) background. Plain "brass" only hits ~2.8:1
+  // there — fine as a button/icon color, but fails WCAG AA (4.5:1)
+  // as body text. Not needed on dark backgrounds, where "brass"
+  // already passes on its own.
+  brassText: "#8B6523",
   risk: "#C2483B",
   safe: "#3E7A54",
   teal: "#2C6E82",
@@ -41,6 +47,7 @@ export const DARK_COLORS = {
   paper: "#141B2B",
   paperDim: "#1A2334",
   brass: "#D4A24E",
+  brassText: "#D4A24E", // already passes fine against the dark paper/card background
   risk: "#E07A6C",
   safe: "#5FAE7C",
   teal: "#4FA3BE",
@@ -359,7 +366,7 @@ function AuditLogPanel() {
           <span style={{ fontFamily: "'IBM Plex Mono', monospace", color: COLORS.muted, flexShrink: 0 }}>
             {entry.created_at ? new Date(entry.created_at).toLocaleString() : "—"}
           </span>
-          <span style={{ color: COLORS.brass, flexShrink: 0 }}>{entry.actor_username} ({entry.actor_role})</span>
+          <span style={{ color: COLORS.brassText, flexShrink: 0 }}>{entry.actor_username} ({entry.actor_role})</span>
           <span>{entry.action}{entry.target ? ` → ${entry.target}` : ""}</span>
         </div>
       ))}

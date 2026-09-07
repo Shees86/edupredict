@@ -1,11 +1,13 @@
 import os
 import time
+import secrets
+import sys
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 import db
 from extensions import stats
-from config import FRONTEND_ORIGIN
+from config import FRONTEND_ORIGINS
 
 from blueprints.auth import auth_bp
 from blueprints.admin import admin_bp
@@ -18,14 +20,29 @@ from blueprints.engagement import engagement_bp
 
 app = Flask(__name__)
 
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
+# SECURITY: never fall back to a hardcoded secret — anyone who can read
+# this public repo would be able to forge session cookies for any
+# account, including admin. If FLASK_SECRET_KEY isn't set, generate a
+# random one per process instead: sessions won't survive a restart,
+# but that's a far safer failure mode than a known, public secret.
+_secret = os.environ.get("FLASK_SECRET_KEY")
+if not _secret:
+    print(
+        "WARNING: FLASK_SECRET_KEY is not set. Using a random per-process "
+        "secret — all sessions will be invalidated on every restart/redeploy. "
+        "Set FLASK_SECRET_KEY in your environment to fix this.",
+        file=sys.stderr,
+    )
+    _secret = secrets.token_hex(32)
+app.secret_key = _secret
+
 app.config.update(
     SESSION_COOKIE_SAMESITE="None",
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,          # JS on the page can't read the session cookie (XSS mitigation)
     MAX_CONTENT_LENGTH=5 * 1024 * 1024,    # 5 MB cap on any request body — blocks oversized upload abuse
 )
-CORS(app, supports_credentials=True, origins=[FRONTEND_ORIGIN])  # never wildcard "*" — only our own frontend
+CORS(app, supports_credentials=True, origins=FRONTEND_ORIGINS)  # explicit allow-list — never a wildcard "*"
 
 
 # Tracks request volume/duration for /api/system/stats.

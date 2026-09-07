@@ -192,17 +192,19 @@ export default function EduPredictDashboard() {
     return (
       <>
         <style>{FONT_IMPORT}{getGlobalCss()}</style>
-        <AnimatePresence mode="wait">
-          {view === "landing" ? (
-            <motion.div key="landing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-              <LandingPage onLogin={() => setView("login")} onSignup={() => setView("register")} isDark={isDark} onToggleTheme={toggleTheme} t={t} />
-            </motion.div>
-          ) : (
-            <motion.div key="auth" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-              <LoginScreen onLogin={setUser} initialMode={view} onBack={() => setView("landing")} t={t} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <main>
+          <AnimatePresence mode="wait">
+            {view === "landing" ? (
+              <motion.div key="landing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+                <LandingPage onLogin={() => setView("login")} onSignup={() => setView("register")} isDark={isDark} onToggleTheme={toggleTheme} t={t} />
+              </motion.div>
+            ) : (
+              <motion.div key="auth" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+                <LoginScreen onLogin={setUser} initialMode={view} onBack={() => setView("landing")} t={t} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </main>
       </>
     );
   }
@@ -215,9 +217,9 @@ export default function EduPredictDashboard() {
       <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", background: COLORS.paper, minHeight: "100vh", color: COLORS.text }}>
         <TopBar user={user} onLogout={() => { setUser(null); setView("landing"); }} isDark={isDark} onToggleTheme={toggleTheme} t={t} onOpenSettings={() => setSettingsOpen(true)} />
         {showBanner && <LiveAlertBanner alert={liveAlert} onDismiss={() => setDismissedAlert(liveAlert)} />}
-        <motion.div key={user.role} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }} className="ep-shell">
+        <motion.main key={user.role} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }} className="ep-shell">
           <RoleView role={user.role} user={user} />
-        </motion.div>
+        </motion.main>
         <FeedbackWidget user={user} />
         <AnimatePresence>
           {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
@@ -429,7 +431,7 @@ function LandingPage({ onLogin, onSignup, isDark, onToggleTheme, t }) {
       {/* Hero — text + 3D visual */}
       <div className="ep-hero-split" style={{ maxWidth: 1120, margin: "0 auto", padding: "56px 32px 40px" }}>
         <motion.div variants={stagger} initial="hidden" animate="show" style={{ textAlign: "left" }}>
-          <motion.div variants={fadeUp} style={{ fontFamily: "'Fraunces', serif", fontSize: 13, letterSpacing: "0.2em", color: COLORS.brass, textTransform: "uppercase", marginBottom: 14 }}>
+          <motion.div variants={fadeUp} style={{ fontFamily: "'Fraunces', serif", fontSize: 13, letterSpacing: "0.2em", color: COLORS.brassText, textTransform: "uppercase", marginBottom: 14 }}>
             {tr("eyebrow")}
           </motion.div>
           <motion.h1 variants={fadeUp} style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: "clamp(32px, 4.6vw, 54px)", color: COLORS.text, lineHeight: 1.12, margin: "0 0 20px" }}>
@@ -665,7 +667,7 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
   // with the main login/register form below.
   if (needs2fa) {
     return (
-      <div className="ep-login-shell" style={{ fontFamily: "'IBM Plex Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+      <div className="ep-login-shell" style={{ fontFamily: "'IBM Plex Sans', sans-serif", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
         <div className="ep-login-texture" />
         <div style={{ width: "100%", maxWidth: 380, position: "relative" }}>
           <div className="ep-login-hero" style={{ textAlign: "center", marginBottom: 32 }}>
@@ -704,7 +706,7 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
   // (from email, or shown directly if SMTP isn't configured) + new password.
   if (isForgot) {
     return (
-      <div className="ep-login-shell" style={{ fontFamily: "'IBM Plex Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+      <div className="ep-login-shell" style={{ fontFamily: "'IBM Plex Sans', sans-serif", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
         <div className="ep-login-texture" />
         <div style={{ width: "100%", maxWidth: 380, position: "relative" }}>
           <button onClick={() => { setMode("login"); setError(""); setNotice(""); }} className="ep-btn" style={{
@@ -763,7 +765,7 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
   // the main login/register form logic below is untouched. ---
   if (needs2fa) {
     return (
-      <div className="ep-login-shell" style={{ fontFamily: "'IBM Plex Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+      <div className="ep-login-shell" style={{ fontFamily: "'IBM Plex Sans', sans-serif", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
         <div className="ep-login-texture" />
         <div style={{ width: "100%", maxWidth: 380, position: "relative" }}>
           <div className="ep-login-hero" style={{ textAlign: "center", marginBottom: 24 }}>
@@ -792,7 +794,7 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
   // --- Forgot / reset password — also a self-contained screen. ---
   if (isForgot) {
     return (
-      <div className="ep-login-shell" style={{ fontFamily: "'IBM Plex Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+      <div className="ep-login-shell" style={{ fontFamily: "'IBM Plex Sans', sans-serif", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
         <div className="ep-login-texture" />
         <div style={{ width: "100%", maxWidth: 380, position: "relative" }}>
           <button onClick={() => { setMode("login"); setError(""); setNotice(""); }} className="ep-btn" style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#9AA7C2", fontSize: 12.5, cursor: "pointer", marginBottom: 18 }}>
@@ -832,7 +834,7 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
 
   return (
     <div className="ep-login-shell" style={{
-      fontFamily: "'IBM Plex Sans', sans-serif",
+      fontFamily: "'IBM Plex Sans', sans-serif", minHeight: "100vh",
       display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px",
     }}>
       <div className="ep-login-texture" />
