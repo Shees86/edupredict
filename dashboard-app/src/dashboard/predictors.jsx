@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer } from "recharts";
 import { GraduationCap, BookOpen, LineChart as LineIcon, ChevronRight } from "lucide-react";
 import { COLORS, apiPost, apiGet, LoadingNote } from "./shared";
 
@@ -56,7 +57,7 @@ export function FieldPredictor() {
           </select>
         </div>
         <button onClick={runPrediction} disabled={loading} className="ep-btn" style={{
-          padding: "9px 18px", background: COLORS.brass, border: "none", color: "#16233F",
+          padding: "9px 18px", background: COLORS.brass, border: "none", color: "#FFFFFF",
           fontWeight: 600, fontSize: 13, cursor: "pointer",
         }}>
           {loading ? "Predicting…" : "Predict"}
@@ -144,7 +145,7 @@ export function UniversityPredictor() {
           </select>
         </div>
         <button onClick={runPrediction} disabled={loading} className="ep-btn" style={{
-          padding: "9px 18px", background: COLORS.brass, border: "none", color: "#16233F",
+          padding: "9px 18px", background: COLORS.brass, border: "none", color: "#FFFFFF",
           fontWeight: 600, fontSize: 13, cursor: "pointer",
         }}>
           {loading ? "Predicting…" : "Predict"}
@@ -234,7 +235,7 @@ export function CgpaPredictor() {
       </div>
 
       <button onClick={runPrediction} disabled={loading} className="ep-btn" style={{
-        padding: "9px 18px", background: COLORS.brass, border: "none", color: "#16233F",
+        padding: "9px 18px", background: COLORS.brass, border: "none", color: "#FFFFFF",
         fontWeight: 600, fontSize: 13, cursor: "pointer", marginBottom: 18,
       }}>
         {loading ? "Predicting…" : "Predict next GPA"}
@@ -242,12 +243,37 @@ export function CgpaPredictor() {
 
       {error && <div style={{ fontSize: 12, color: COLORS.risk, marginBottom: 12 }}>{error}</div>}
       {result && (
-        <div style={{ borderLeft: `3px solid ${trendColor}`, paddingLeft: 14 }}>
-          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 24, fontWeight: 500, color: COLORS.text }}>
-            {result.predicted_next_gpa.toFixed(2)} <span style={{ fontSize: 13, color: COLORS.muted }}>/ 4.00</span>
+        <div>
+          <div style={{ borderLeft: `3px solid ${trendColor}`, paddingLeft: 14, marginBottom: 16 }}>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 24, fontWeight: 500, color: COLORS.text }}>
+              {result.predicted_next_gpa.toFixed(2)} <span style={{ fontSize: 13, color: COLORS.muted }}>/ 4.00</span>
+            </div>
+            <div style={{ fontSize: 12, color: trendColor, textTransform: "capitalize", marginTop: 4 }}>
+              Trend: {result.trend} (from {result.current_gpa.toFixed(2)})
+            </div>
           </div>
-          <div style={{ fontSize: 12, color: trendColor, textTransform: "capitalize", marginTop: 4 }}>
-            Trend: {result.trend} (from {result.current_gpa.toFixed(2)})
+          <div style={{ height: 160 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={[
+                  { label: "Previous Semester", gpa: result.current_gpa },
+                  { label: "Predicted Next Semester", gpa: result.predicted_next_gpa },
+                ]}
+                margin={{ top: 4, right: 8, left: -18, bottom: 4 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.line} vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: COLORS.muted }} axisLine={{ stroke: COLORS.line }} tickLine={false} />
+                <YAxis domain={[0, 4]} tick={{ fontSize: 11, fill: COLORS.muted }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  formatter={(v) => [v.toFixed(2), "GPA"]}
+                  contentStyle={{ background: COLORS.cardBg, border: `1px solid ${COLORS.line}`, fontSize: 12 }}
+                />
+                <Bar dataKey="gpa" radius={[4, 4, 0, 0]}>
+                  <Cell fill={COLORS.teal} />
+                  <Cell fill={trendColor} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
@@ -342,7 +368,7 @@ export function GoalsAndBadges({ studentId, record }) {
           </select>
           <input type="number" value={targetValue} onChange={e => setTargetValue(e.target.value)}
             style={{ width: 80, padding: "6px 8px", border: `1px solid ${COLORS.line}`, fontFamily: "'IBM Plex Mono', monospace", fontSize: 12.5 }} />
-          <button onClick={saveGoal} className="ep-btn" style={{ fontSize: 12, background: COLORS.brass, border: "none", color: "#16233F", fontWeight: 600, padding: "6px 12px", cursor: "pointer" }}>
+          <button onClick={saveGoal} className="ep-btn" style={{ fontSize: 12, background: COLORS.brass, border: "none", color: "#FFFFFF", fontWeight: 600, padding: "6px 12px", cursor: "pointer" }}>
             {saved ? "Saved ✓" : "Set goal"}
           </button>
         </div>

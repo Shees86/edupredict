@@ -87,6 +87,48 @@ def health():
     return jsonify({"status": "ok"}), 200
 
 
+# ---------------------------------------------------------------
+# Consistent JSON error responses. Without these, Flask's default
+# error pages are plain HTML — fine for a browser hitting a page
+# directly, but the frontend expects JSON with an "error" field from
+# every endpoint, so an unhandled 404/405/500 would otherwise hand it
+# a chunk of HTML instead and break silently.
+# ---------------------------------------------------------------
+@app.errorhandler(400)
+def handle_400(e):
+    return jsonify({"error": "Bad request.", "status": 400}), 400
+
+
+@app.errorhandler(401)
+def handle_401(e):
+    return jsonify({"error": "Not authenticated.", "status": 401}), 401
+
+
+@app.errorhandler(403)
+def handle_403(e):
+    return jsonify({"error": "Forbidden.", "status": 403}), 403
+
+
+@app.errorhandler(404)
+def handle_404(e):
+    return jsonify({"error": "Not found.", "status": 404}), 404
+
+
+@app.errorhandler(405)
+def handle_405(e):
+    return jsonify({"error": "Method not allowed.", "status": 405}), 405
+
+
+@app.errorhandler(500)
+def handle_500(e):
+    return jsonify({"error": "Internal server error.", "status": 500}), 500
+
+
+@app.errorhandler(503)
+def handle_503(e):
+    return jsonify({"error": "Service temporarily unavailable.", "status": 503}), 503
+
+
 if __name__ == "__main__":
     db.init_indexes()
     port = int(os.environ.get("PORT", 5000))

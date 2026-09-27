@@ -144,17 +144,23 @@ def me():
 def forgot_password():
     data = request.get_json(force=True)
     username = data.get("username", "")
+
+    # NOTE: this intentionally reveals whether an account exists,
+    # per product decision — trades away protection against account
+    # enumeration for clearer UX. See docs/SECURITY.md.
+    if not db.users_col.find_one({"username": username}):
+        return jsonify({"error": f'No account found for "{username}".'}), 404
+
     token = db.create_reset_token(username)
-    # Same response either way, to avoid username enumeration.
     if not token:
-        return jsonify({"message": "If that account exists, a reset link has been generated."}), 200
+        return jsonify({"error": f'No account found for "{username}".'}), 404
 
     email, _ = db.get_user_email_and_prefs(username)
     sent = False
     if email:
         sent = emailer.send_password_reset_email(email, token, FRONTEND_ORIGIN)
 
-    response = {"message": "If that account exists, a reset link has been generated."}
+    response = {"message": "Reset link generated."}
     if not sent:
         # No SMTP configured — return the token directly for local testing.
         response["dev_reset_token"] = token

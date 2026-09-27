@@ -6,14 +6,15 @@ import {
 } from "lucide-react";
 import Hero3D from "./Hero3D";
 import {
-  API_BASE, COLORS, BRAND_NAVY, _isDarkTheme, applyTheme, apiGet, apiPost, LoadingNote,
+  API_BASE, COLORS, BRAND_NAVY, _isDarkTheme, applyTheme, apiGet, apiPost, setAuthenticated, LoadingNote,
 } from "./dashboard/shared";
 import { AdminView } from "./dashboard/views/AdminView";
 import { TeacherView } from "./dashboard/views/TeacherView";
 import { StudentView } from "./dashboard/views/StudentView";
 import { AnalystView } from "./dashboard/views/AnalystView";
+import { ErrorScreen } from "./dashboard/ErrorScreen";
 
-const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');`;
+const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');`;
 
 function getGlobalCss() {
   return `
@@ -39,25 +40,38 @@ function getGlobalCss() {
   @keyframes epPulseRing { 0% { box-shadow: 0 0 0 0 rgba(194,72,59,0.35); } 100% { box-shadow: 0 0 0 8px rgba(194,72,59,0); } }
   @keyframes epCountBlink { from { opacity: 0.4; } to { opacity: 1; } }
 
-  .ep-btn { transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease; border-radius: 3px; }
-  .ep-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+  .ep-btn { transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, transform 0.1s ease; border-radius: 6px; }
+  .ep-btn:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
   .ep-btn:active:not(:disabled) { transform: translateY(0px); }
   .ep-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .ep-btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
     outline: 2px solid ${COLORS.brass}; outline-offset: 1px;
   }
-  .ep-btn-primary { box-shadow: 0 1px 2px rgba(22,35,63,0.15); }
-  .ep-btn-primary:hover:not(:disabled) { box-shadow: 0 4px 12px rgba(184,134,46,0.35); }
 
   .ep-row-hover { transition: background 0.15s ease; }
-  .ep-row-hover:hover { background: rgba(184,134,46,0.07); }
+  .ep-row-hover:hover { background: rgba(0,0,0,0.05); }
 
   .ep-card {
-    background: ${COLORS.cardBg}; border: 1px solid ${COLORS.line}; border-radius: 6px;
-    box-shadow: 0 1px 2px rgba(22,35,63,0.04), 0 8px 24px -12px rgba(22,35,63,0.10);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    background: ${COLORS.cardBg}; border: 1px solid ${COLORS.line}; border-radius: 28px;
+    transition: transform 0.2s ease;
   }
-  .ep-card-hover:hover { box-shadow: 0 4px 8px rgba(22,35,63,0.06), 0 16px 32px -14px rgba(22,35,63,0.16); transform: translateY(-2px); }
+
+  /* --- DESIGN.md system: flat, monochrome, condensed uppercase
+     display type. Rather than rewrite every one of the many inline
+     fontFamily declarations across the app, these attribute-selector
+     rules retarget them centrally: any element whose inline style
+     mentions the old font names picks up the new ones instead
+     (an !important stylesheet rule is one of the few things that can
+     override an inline style, which is what makes this work). */
+  [style*="Fraunces"] {
+    font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif !important;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+  }
+  [style*="IBM Plex Sans"] {
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif !important;
+  }
+  .ep-card-hover:hover { transform: translateY(-2px); }
 
   .ep-stagger > * { animation: epRise 0.5s ease both; }
   .ep-stagger > *:nth-child(1) { animation-delay: 0.02s; }
@@ -152,7 +166,7 @@ function getGlobalCss() {
   .ep-pulse-dot { width: 6px; height: 6px; border-radius: 50%; background: #C2483B; animation: epPulseRing 1.6s infinite; }
 
   .ep-login-shell {
-    position: relative; overflow: hidden; min-height: 100vh; background: radial-gradient(ellipse 900px 500px at 50% -10%, #1D2C4C 0%, #12203A 55%, #0D1830 100%);
+    position: relative; overflow: hidden; min-height: 100vh; background: radial-gradient(ellipse 900px 500px at 50% -10%, #2A2A2A 0%, #171717 55%, #000000 100%);
   }
   .ep-login-texture {
     position: absolute; inset: 0; opacity: 0.5; pointer-events: none;
@@ -172,8 +186,21 @@ function getGlobalCss() {
 export default function EduPredictDashboard() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState("landing"); // "landing" | "login" | "register"
+  const [sessionExpired, setSessionExpired] = useState(false);
   const liveAlert = useLiveAlerts(!!user && ["admin", "teacher", "analyst"].includes(user?.role));
   const [dismissedAlert, setDismissedAlert] = useState(null);
+
+  useEffect(() => { setAuthenticated(!!user); }, [user]);
+
+  useEffect(() => {
+    function onSessionExpired() {
+      setUser(null);
+      setSessionExpired(true);
+      setView("login");
+    }
+    window.addEventListener("ep:session-expired", onSessionExpired);
+    return () => window.removeEventListener("ep:session-expired", onSessionExpired);
+  }, []);
 
   // Dark mode: COLORS is a mutated shared object (see applyTheme), so
   // toggling this tick just forces the whole tree to re-render and
@@ -200,7 +227,7 @@ export default function EduPredictDashboard() {
               </motion.div>
             ) : (
               <motion.div key="auth" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-                <LoginScreen onLogin={setUser} initialMode={view} onBack={() => setView("landing")} t={t} />
+                <LoginScreen onLogin={setUser} initialMode={view} onBack={() => setView("landing")} t={t} sessionExpired={sessionExpired} onDismissSessionExpired={() => setSessionExpired(false)} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -329,7 +356,7 @@ function SettingsModal({ onClose }) {
               <input type="checkbox" checked={prefs.in_app_alerts} onChange={(e) => setPrefs({ ...prefs, in_app_alerts: e.target.checked })} />
               Show real-time in-app alert banner
             </label>
-            <button onClick={savePrefs} className="ep-btn ep-btn-primary" style={{ padding: "7px 16px", background: COLORS.brass, border: "none", color: "#16233F", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+            <button onClick={savePrefs} className="ep-btn ep-btn-primary" style={{ padding: "7px 16px", background: COLORS.brass, border: "none", color: "#FFFFFF", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
               {saved ? "Saved ✓" : "Save preferences"}
             </button>
           </div>
@@ -357,7 +384,7 @@ function SettingsModal({ onClose }) {
             <div style={{ display: "flex", gap: 8 }}>
               <input value={totpCode} onChange={(e) => setTotpCode(e.target.value)} placeholder="6-digit code"
                 style={{ flex: 1, padding: "8px 10px", border: `1px solid ${COLORS.line}`, fontFamily: "'IBM Plex Mono', monospace", fontSize: 13 }} />
-              <button onClick={confirmTotp} className="ep-btn ep-btn-primary" style={{ padding: "8px 16px", background: COLORS.brass, border: "none", color: "#16233F", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+              <button onClick={confirmTotp} className="ep-btn ep-btn-primary" style={{ padding: "8px 16px", background: COLORS.brass, border: "none", color: "#FFFFFF", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
                 Confirm
               </button>
             </div>
@@ -402,25 +429,25 @@ function LandingPage({ onLogin, onSignup, isDark, onToggleTheme, t }) {
         }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div className="ep-logo-mark">E</div>
-          <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 19, color: "#F4F1E9" }}>EduPredict</span>
+          <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 19, color: "#F5F5F5" }}>EduPredict</span>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {onToggleTheme && (
             <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={onToggleTheme} style={{
-              padding: "8px 12px", background: "none", border: `1px solid ${COLORS.inkSoft}`, color: "#F4F1E9",
+              padding: "8px 12px", background: "none", border: `1px solid ${COLORS.inkSoft}`, color: "#F5F5F5",
               fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "'IBM Plex Sans', sans-serif", borderRadius: 3,
             }}>
               {isDark ? "☀" : "☾"}
             </motion.button>
           )}
           <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={onLogin} style={{
-            padding: "8px 16px", background: "none", border: `1px solid ${COLORS.inkSoft}`, color: "#F4F1E9",
+            padding: "8px 16px", background: "none", border: `1px solid ${COLORS.inkSoft}`, color: "#F5F5F5",
             fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'IBM Plex Sans', sans-serif", borderRadius: 3,
           }}>
             {tr("login")}
           </motion.button>
           <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={onSignup} style={{
-            padding: "8px 16px", background: COLORS.brass, border: "none", color: "#16233F",
+            padding: "8px 16px", background: COLORS.brass, border: "none", color: "#FFFFFF",
             fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'IBM Plex Sans', sans-serif", borderRadius: 3,
           }}>
             {tr("signup")}
@@ -441,9 +468,9 @@ function LandingPage({ onLogin, onSignup, isDark, onToggleTheme, t }) {
             {tr("hero_tagline")}
           </motion.p>
           <motion.div variants={fadeUp} style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <motion.button whileHover={{ scale: 1.03, boxShadow: "0 8px 20px rgba(184,134,46,0.35)" }} whileTap={{ scale: 0.97 }}
+            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
               onClick={onSignup} style={{
-                padding: "13px 28px", background: COLORS.brass, border: "none", color: "#16233F", borderRadius: 3,
+                padding: "13px 28px", background: COLORS.brass, border: "none", color: "#FFFFFF", borderRadius: 3,
                 fontSize: 14.5, fontWeight: 600, cursor: "pointer", fontFamily: "'IBM Plex Sans', sans-serif",
               }}>
               {tr("get_started")}
@@ -502,7 +529,7 @@ function LandingPage({ onLogin, onSignup, isDark, onToggleTheme, t }) {
   );
 }
 
-function LoginScreen({ onLogin, initialMode = "login", onBack }) {
+function LoginScreen({ onLogin, initialMode = "login", onBack, sessionExpired, onDismissSessionExpired }) {
   const [mode, setMode] = useState(initialMode); // "login" | "register" | "forgot"
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -590,7 +617,11 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
       });
       const data = await res.json().catch(() => ({}));
       setSubmitting(false);
-      setNotice(data.message || "If that account exists, a reset link has been generated.");
+      if (!res.ok) {
+        setError(data.error || "Something went wrong. Please try again.");
+        return;
+      }
+      setNotice(data.message || "Reset link generated.");
       if (data.dev_reset_token) setDevResetToken(data.dev_reset_token); // no email configured — show it directly for demo/testing
     } catch {
       setSubmitting(false);
@@ -674,10 +705,10 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
               <div className="ep-logo-mark" style={{ width: 44, height: 44, fontSize: 20 }}>E</div>
             </div>
-            <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 28, color: "#F4F1E9" }}>Two-Factor Code</div>
-            <div style={{ fontSize: 13, color: "#9AA7C2", marginTop: 8 }}>Enter the 6-digit code from your authenticator app</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 28, color: "#F5F5F5" }}>Two-Factor Code</div>
+            <div style={{ fontSize: 13, color: "#9A9A9A", marginTop: 8 }}>Enter the 6-digit code from your authenticator app</div>
           </div>
-          <form onSubmit={handleVerify2fa} className="ep-login-card" style={{ background: "#1D2C4C", border: `1px solid ${COLORS.inkSoft}`, borderRadius: 8, padding: 28, boxShadow: "0 20px 60px -20px rgba(0,0,0,0.5)" }}>
+          <form onSubmit={handleVerify2fa} className="ep-login-card" style={{ background: "#1A1A1A", border: `1px solid ${COLORS.inkSoft}`, borderRadius: 20, padding: 28 }}>
             <label style={labelStyle}>Authentication code</label>
             <input value={totpCode} onChange={e => setTotpCode(e.target.value)} placeholder="123456" style={inputStyle} autoFocus />
             {error && (
@@ -686,13 +717,13 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
               </div>
             )}
             <button type="submit" disabled={submitting} className="ep-btn ep-btn-primary" style={{
-              width: "100%", marginTop: 8, padding: "11px 0", background: COLORS.brass, color: "#16233F",
+              width: "100%", marginTop: 8, padding: "11px 0", background: COLORS.brass, color: "#FFFFFF",
               border: "none", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "'IBM Plex Sans', sans-serif",
             }}>
               {submitting ? "Verifying…" : "Verify"}
             </button>
             <button type="button" onClick={() => { setNeeds2fa(false); setTotpCode(""); setError(""); }} className="ep-btn" style={{
-              width: "100%", marginTop: 10, padding: "8px 0", background: "none", border: "none", color: "#9AA7C2", fontSize: 12, cursor: "pointer",
+              width: "100%", marginTop: 10, padding: "8px 0", background: "none", border: "none", color: "#9A9A9A", fontSize: 12, cursor: "pointer",
             }}>
               ← Back to sign in
             </button>
@@ -711,36 +742,36 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
         <div style={{ width: "100%", maxWidth: 380, position: "relative" }}>
           <button onClick={() => { setMode("login"); setError(""); setNotice(""); }} className="ep-btn" style={{
             display: "flex", alignItems: "center", gap: 6, background: "none", border: "none",
-            color: "#9AA7C2", fontSize: 12.5, cursor: "pointer", marginBottom: 18, fontFamily: "'IBM Plex Sans', sans-serif",
+            color: "#9A9A9A", fontSize: 12.5, cursor: "pointer", marginBottom: 18, fontFamily: "'IBM Plex Sans', sans-serif",
           }}>
             ← Back to sign in
           </button>
           <div className="ep-login-hero" style={{ textAlign: "center", marginBottom: 32 }}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 28, color: "#F4F1E9" }}>Reset Password</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 28, color: "#F5F5F5" }}>Reset Password</div>
           </div>
           {!resetToken && !devResetToken ? (
-            <form onSubmit={handleForgotPassword} className="ep-login-card" style={{ background: "#1D2C4C", border: `1px solid ${COLORS.inkSoft}`, borderRadius: 8, padding: 28, boxShadow: "0 20px 60px -20px rgba(0,0,0,0.5)" }}>
+            <form onSubmit={handleForgotPassword} className="ep-login-card" style={{ background: "#1A1A1A", border: `1px solid ${COLORS.inkSoft}`, borderRadius: 20, padding: 28 }}>
               <label style={labelStyle}>Username</label>
               <input value={username} onChange={e => setUsername(e.target.value)} placeholder="Your username" style={inputStyle} />
               {notice && <div style={{ color: "#8FCBA0", fontSize: 12, marginTop: 10 }}>{notice}</div>}
               {devResetToken && (
-                <div style={{ fontSize: 11, color: "#9AA7C2", marginTop: 8, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 8, lineHeight: 1.5 }}>
                   No email is configured on this server, so here's your reset token directly (dev/demo mode only):
-                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", background: "#16233F", padding: 8, marginTop: 6, wordBreak: "break-all" }}>{devResetToken}</div>
+                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", background: "#000000", padding: 8, marginTop: 6, wordBreak: "break-all" }}>{devResetToken}</div>
                   <button type="button" onClick={() => setResetToken(devResetToken)} className="ep-btn" style={{ marginTop: 8, background: "none", border: `1px solid ${COLORS.brass}`, color: COLORS.brass, padding: "6px 10px", fontSize: 12, cursor: "pointer" }}>
                     Use this token now
                   </button>
                 </div>
               )}
               <button type="submit" disabled={submitting} className="ep-btn ep-btn-primary" style={{
-                width: "100%", marginTop: 14, padding: "11px 0", background: COLORS.brass, color: "#16233F",
+                width: "100%", marginTop: 14, padding: "11px 0", background: COLORS.brass, color: "#FFFFFF",
                 border: "none", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "'IBM Plex Sans', sans-serif",
               }}>
                 {submitting ? "Sending…" : "Send reset link"}
               </button>
             </form>
           ) : (
-            <form onSubmit={handleResetPassword} className="ep-login-card" style={{ background: "#1D2C4C", border: `1px solid ${COLORS.inkSoft}`, borderRadius: 8, padding: 28, boxShadow: "0 20px 60px -20px rgba(0,0,0,0.5)" }}>
+            <form onSubmit={handleResetPassword} className="ep-login-card" style={{ background: "#1A1A1A", border: `1px solid ${COLORS.inkSoft}`, borderRadius: 20, padding: 28 }}>
               <label style={labelStyle}>Reset token</label>
               <input value={resetToken} onChange={e => setResetToken(e.target.value)} placeholder="Paste your reset token" style={inputStyle} />
               <label style={labelStyle}>New password</label>
@@ -748,7 +779,7 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
               {error && <div style={{ color: "#F4A79E", fontSize: 12, marginTop: 10 }}>{error}</div>}
               {notice && <div style={{ color: "#8FCBA0", fontSize: 12, marginTop: 10 }}>{notice}</div>}
               <button type="submit" disabled={submitting} className="ep-btn ep-btn-primary" style={{
-                width: "100%", marginTop: 14, padding: "11px 0", background: COLORS.brass, color: "#16233F",
+                width: "100%", marginTop: 14, padding: "11px 0", background: COLORS.brass, color: "#FFFFFF",
                 border: "none", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "'IBM Plex Sans', sans-serif",
               }}>
                 {submitting ? "Saving…" : "Set new password"}
@@ -772,17 +803,17 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
               <div className="ep-logo-mark" style={{ width: 44, height: 44, fontSize: 20 }}>E</div>
             </div>
-            <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 26, color: "#F4F1E9" }}>Enter your 2FA code</div>
-            <div style={{ fontSize: 13, color: "#9AA7C2", marginTop: 8 }}>Open your authenticator app and enter the 6-digit code.</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 26, color: "#F5F5F5" }}>Enter your 2FA code</div>
+            <div style={{ fontSize: 13, color: "#9A9A9A", marginTop: 8 }}>Open your authenticator app and enter the 6-digit code.</div>
           </div>
-          <form onSubmit={handleVerify2fa} className="ep-login-card" style={{ background: "#1D2C4C", border: `1px solid ${COLORS.inkSoft}`, borderRadius: 8, padding: 28 }}>
+          <form onSubmit={handleVerify2fa} className="ep-login-card" style={{ background: "#1A1A1A", border: `1px solid ${COLORS.inkSoft}`, borderRadius: 8, padding: 28 }}>
             <label style={labelStyle}>Authentication code</label>
             <input value={totpCode} onChange={e => setTotpCode(e.target.value)} placeholder="123456" style={inputStyle} autoFocus />
             {error && <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#F4A79E", fontSize: 12, marginTop: 10 }}><AlertTriangle size={13} /> {error}</div>}
-            <button type="submit" disabled={submitting} className="ep-btn ep-btn-primary" style={{ width: "100%", marginTop: 16, padding: "11px 0", background: COLORS.brass, color: "#16233F", border: "none", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+            <button type="submit" disabled={submitting} className="ep-btn ep-btn-primary" style={{ width: "100%", marginTop: 16, padding: "11px 0", background: COLORS.brass, color: "#FFFFFF", border: "none", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
               {submitting ? "Verifying…" : "Verify & sign in"}
             </button>
-            <button type="button" onClick={() => { setNeeds2fa(false); setTotpCode(""); setError(""); }} className="ep-btn" style={{ width: "100%", marginTop: 10, padding: "8px 0", background: "none", border: "none", color: "#9AA7C2", fontSize: 12.5, cursor: "pointer" }}>
+            <button type="button" onClick={() => { setNeeds2fa(false); setTotpCode(""); setError(""); }} className="ep-btn" style={{ width: "100%", marginTop: 10, padding: "8px 0", background: "none", border: "none", color: "#9A9A9A", fontSize: 12.5, cursor: "pointer" }}>
               ← Back to sign in
             </button>
           </form>
@@ -797,13 +828,13 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
       <div className="ep-login-shell" style={{ fontFamily: "'IBM Plex Sans', sans-serif", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
         <div className="ep-login-texture" />
         <div style={{ width: "100%", maxWidth: 380, position: "relative" }}>
-          <button onClick={() => { setMode("login"); setError(""); setNotice(""); }} className="ep-btn" style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#9AA7C2", fontSize: 12.5, cursor: "pointer", marginBottom: 18 }}>
+          <button onClick={() => { setMode("login"); setError(""); setNotice(""); }} className="ep-btn" style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#9A9A9A", fontSize: 12.5, cursor: "pointer", marginBottom: 18 }}>
             ← Back to sign in
           </button>
           <div className="ep-login-hero" style={{ textAlign: "center", marginBottom: 24 }}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 26, color: "#F4F1E9" }}>Reset your password</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 26, color: "#F5F5F5" }}>Reset your password</div>
           </div>
-          <form onSubmit={resetToken || devResetToken ? handleResetPassword : handleForgotPassword} className="ep-login-card" style={{ background: "#1D2C4C", border: `1px solid ${COLORS.inkSoft}`, borderRadius: 8, padding: 28 }}>
+          <form onSubmit={resetToken || devResetToken ? handleResetPassword : handleForgotPassword} className="ep-login-card" style={{ background: "#1A1A1A", border: `1px solid ${COLORS.inkSoft}`, borderRadius: 8, padding: 28 }}>
             {!devResetToken ? (
               <>
                 <label style={labelStyle}>Username</label>
@@ -813,7 +844,7 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
               <>
                 <div style={{ fontSize: 11.5, color: "#8FCBA0", marginBottom: 14, lineHeight: 1.5 }}>
                   No email is configured on this server, so here's your reset token directly (for demo/dev use):
-                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, background: "#16233F", padding: "8px 10px", marginTop: 6, wordBreak: "break-all" }}>{devResetToken}</div>
+                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, background: "#000000", padding: "8px 10px", marginTop: 6, wordBreak: "break-all" }}>{devResetToken}</div>
                 </div>
                 <label style={labelStyle}>Reset token</label>
                 <input value={resetToken} onChange={e => setResetToken(e.target.value)} placeholder="Paste token" style={inputStyle} />
@@ -823,7 +854,7 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
             )}
             {error && <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#F4A79E", fontSize: 12, marginTop: 10 }}><AlertTriangle size={13} /> {error}</div>}
             {notice && <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#8FCBA0", fontSize: 12, marginTop: 10 }}><ShieldCheck size={13} /> {notice}</div>}
-            <button type="submit" disabled={submitting} className="ep-btn ep-btn-primary" style={{ width: "100%", marginTop: 16, padding: "11px 0", background: COLORS.brass, color: "#16233F", border: "none", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+            <button type="submit" disabled={submitting} className="ep-btn ep-btn-primary" style={{ width: "100%", marginTop: 16, padding: "11px 0", background: COLORS.brass, color: "#FFFFFF", border: "none", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
               {submitting ? "Please wait…" : (devResetToken || resetToken ? "Set new password" : "Send reset link")}
             </button>
           </form>
@@ -842,7 +873,7 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
         {onBack && (
           <button onClick={onBack} className="ep-btn" style={{
             display: "flex", alignItems: "center", gap: 6, background: "none", border: "none",
-            color: "#9AA7C2", fontSize: 12.5, cursor: "pointer", marginBottom: 18, fontFamily: "'IBM Plex Sans', sans-serif",
+            color: "#9A9A9A", fontSize: 12.5, cursor: "pointer", marginBottom: 18, fontFamily: "'IBM Plex Sans', sans-serif",
           }}>
             ← Back to home
           </button>
@@ -854,24 +885,38 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 13, letterSpacing: "0.2em", color: COLORS.brass, textTransform: "uppercase", marginBottom: 6 }}>
             Academic Analytics
           </div>
-          <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 36, color: "#F4F1E9", lineHeight: 1.1 }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 36, color: "#F5F5F5", lineHeight: 1.1 }}>
             EduPredict
           </div>
-          <div style={{ fontSize: 13, color: "#9AA7C2", marginTop: 8 }}>
+          <div style={{ fontSize: 13, color: "#9A9A9A", marginTop: 8 }}>
             Dropout risk &amp; performance intelligence
           </div>
         </div>
 
-        <form onSubmit={isRegister ? handleRegister : handleLogin} className="ep-login-card" style={{ background: "#1D2C4C", border: `1px solid ${COLORS.inkSoft}`, borderRadius: 8, padding: 28, boxShadow: "0 20px 60px -20px rgba(0,0,0,0.5)" }}>
+        {sessionExpired && (
+          <div style={{
+            background: "rgba(226,163,50,0.12)", border: `1px solid ${COLORS.brass}`, borderRadius: 6,
+            padding: "10px 14px", fontSize: 12.5, color: "#F0D9A8", marginBottom: 18, display: "flex",
+            alignItems: "center", justifyContent: "space-between", gap: 10,
+          }}>
+            <span>Your session ended — please sign in again.</span>
+            {onDismissSessionExpired && (
+              <button onClick={onDismissSessionExpired} type="button" style={{
+                background: "none", border: "none", color: "#F0D9A8", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0,
+              }} aria-label="Dismiss">×</button>
+            )}
+          </div>
+        )}
+        <form onSubmit={isRegister ? handleRegister : handleLogin} className="ep-login-card" style={{ background: "#1A1A1A", border: `1px solid ${COLORS.inkSoft}`, borderRadius: 20, padding: 28 }}>
 
-          <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "#16233F", borderRadius: 5, padding: 3 }}>
+          <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "#000000", borderRadius: 5, padding: 3 }}>
             {["login", "register"].map(m => (
               <button key={m} type="button" onClick={() => { setMode(m); setError(""); setNotice(""); }} className="ep-btn"
                 style={{
                   flex: 1, padding: "7px 0", border: "none", borderRadius: 3, cursor: "pointer",
                   fontSize: 12.5, fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif",
                   background: mode === m ? COLORS.brass : "transparent",
-                  color: mode === m ? "#16233F" : "#9AA7C2",
+                  color: mode === m ? "#FFFFFF" : "#9A9A9A",
                 }}>
                 {m === "login" ? "Sign in" : "Create account"}
               </button>
@@ -891,7 +936,7 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
                         display: "flex", alignItems: "center", gap: 6, padding: "8px 10px",
                         border: `1px solid ${active ? COLORS.brass : COLORS.inkSoft}`,
                         background: active ? "rgba(184,134,46,0.14)" : "transparent",
-                        color: active ? COLORS.brass : "#9AA7C2",
+                        color: active ? COLORS.brass : "#9A9A9A",
                         fontSize: 12.5, cursor: "pointer", fontFamily: "'IBM Plex Sans', sans-serif",
                       }}>
                       <Icon size={14} /> {r.label}
@@ -920,7 +965,7 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
             style={inputStyle}
           />
           {role === "student" && (
-            <div style={{ fontSize: 11.5, color: "#9AA7C2", marginTop: -8, marginBottom: 12, lineHeight: 1.45 }}>
+            <div style={{ fontSize: 11.5, color: "#9A9A9A", marginTop: -8, marginBottom: 12, lineHeight: 1.45 }}>
               Must match the Student ID provided in your institutional records.
             </div>
           )}
@@ -929,7 +974,7 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
           <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={isRegister ? "Choose a password" : "••••••••"} style={inputStyle} />
           {!isRegister && (
             <button type="button" onClick={() => { setMode("forgot"); setError(""); setNotice(""); }} className="ep-btn" style={{
-              background: "none", border: "none", color: "#9AA7C2", fontSize: 11.5, cursor: "pointer", padding: "6px 0", textDecoration: "underline",
+              background: "none", border: "none", color: "#9A9A9A", fontSize: 11.5, cursor: "pointer", padding: "6px 0", textDecoration: "underline",
             }}>
               Forgot password?
             </button>
@@ -947,7 +992,7 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
           )}
 
           <button type="submit" disabled={submitting} className="ep-btn ep-btn-primary" style={{
-            width: "100%", marginTop: 8, padding: "11px 0", background: COLORS.brass, color: "#16233F",
+            width: "100%", marginTop: 8, padding: "11px 0", background: COLORS.brass, color: "#FFFFFF",
             border: "none", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "'IBM Plex Sans', sans-serif",
           }}>
             {submitting ? (isRegister ? "Creating account…" : "Signing in…") : (isRegister ? "Create account" : "Sign in")}
@@ -955,7 +1000,7 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
 
           {!isRegister && (
             <button type="button" onClick={() => { setMode("forgot"); setError(""); setNotice(""); }} className="ep-btn"
-              style={{ display: "block", margin: "10px auto 0", background: "none", border: "none", color: "#9AA7C2", fontSize: 12, cursor: "pointer" }}>
+              style={{ display: "block", margin: "10px auto 0", background: "none", border: "none", color: "#9A9A9A", fontSize: 12, cursor: "pointer" }}>
               Forgot password?
             </button>
           )}
@@ -966,7 +1011,7 @@ function LoginScreen({ onLogin, initialMode = "login", onBack }) {
   );
 }
 const labelStyle = { display: "block", fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", color: "#7280A0", marginBottom: 6, marginTop: 14 };
-const inputStyle = { width: "100%", padding: "9px 10px", background: "#16233F", border: `1px solid ${COLORS.inkSoft}`, borderRadius: 3, color: "#F4F1E9", fontSize: 14, fontFamily: "'IBM Plex Mono', monospace", boxSizing: "border-box" };
+const inputStyle = { width: "100%", padding: "9px 10px", background: "#000000", border: `1px solid ${COLORS.inkSoft}`, borderRadius: 3, color: "#F5F5F5", fontSize: 14, fontFamily: "'IBM Plex Mono', monospace", boxSizing: "border-box" };
 
 function TopBar({ user, onLogout, isDark, onToggleTheme, t, onOpenSettings }) {
   const [displayName, setDisplayName] = useState(user?.full_name || user?.username || "");
@@ -987,13 +1032,13 @@ function TopBar({ user, onLogout, isDark, onToggleTheme, t, onOpenSettings }) {
 
   return (
     <div className="ep-topbar" style={{
-      padding: "16px 28px", background: BRAND_NAVY, color: "#F4F1E9",
+      padding: "16px 28px", background: BRAND_NAVY, color: "#F5F5F5",
       borderBottom: `3px solid ${COLORS.brass}`,
     }}>
       <div className="ep-topbar-left">
         <div className="ep-logo-mark">E</div>
         <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 20 }}>EduPredict</span>
-        <span style={{ fontSize: 11, color: "#9AA7C2", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+        <span style={{ fontSize: 11, color: "#9A9A9A", letterSpacing: "0.08em", textTransform: "uppercase" }}>
           {t ? t(`${user.role}_view`) : `${user.role} view`}
         </span>
       </div>
@@ -1087,7 +1132,7 @@ function FeedbackWidget({ user }) {
   return (
     <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 50 }}>
       {open && (
-        <div className="ep-feedback-panel" style={{ width: 280, maxWidth: "calc(100vw - 40px)", background: COLORS.cardBg, border: `1px solid ${COLORS.line}`, borderRadius: 6, boxShadow: "0 12px 32px rgba(22,35,63,0.18)", padding: 16, marginBottom: 10 }}>
+        <div className="ep-feedback-panel" style={{ width: 280, maxWidth: "calc(100vw - 40px)", background: COLORS.cardBg, border: `1px solid ${COLORS.line}`, borderRadius: 20, padding: 16, marginBottom: 10 }}>
           <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 14, marginBottom: 10 }}>Feedback & Support</div>
           <select value={category} onChange={e => setCategory(e.target.value)} style={{ width: "100%", padding: 6, marginBottom: 8, fontSize: 12.5, border: `1px solid ${COLORS.line}`, fontFamily: "'IBM Plex Sans', sans-serif" }}>
             <option value="feedback">General feedback</option>
@@ -1097,15 +1142,14 @@ function FeedbackWidget({ user }) {
           <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="Tell us what's up…"
             style={{ width: "100%", height: 70, padding: 6, fontSize: 12.5, border: `1px solid ${COLORS.line}`, boxSizing: "border-box", fontFamily: "'IBM Plex Sans', sans-serif", resize: "none" }} />
           {error && <div style={{ fontSize: 11, color: COLORS.risk, marginTop: 6 }}>{error}</div>}
-          <button onClick={submit} disabled={submitting} className="ep-btn" style={{ width: "100%", marginTop: 8, padding: "8px 0", background: COLORS.brass, border: "none", color: "#16233F", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+          <button onClick={submit} disabled={submitting} className="ep-btn" style={{ width: "100%", marginTop: 8, padding: "8px 0", background: COLORS.brass, border: "none", color: "#FFFFFF", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
             {sent ? "Sent ✓" : submitting ? "Sending…" : "Submit"}
           </button>
         </div>
       )}
       <button onClick={() => setOpen(o => !o)} className="ep-btn" style={{
-        width: 44, height: 44, borderRadius: "50%", background: BRAND_NAVY, color: "#F4F1E9",
+        width: 44, height: 44, borderRadius: "50%", background: BRAND_NAVY, color: "#F5F5F5",
         border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
       }}>
         <Bell size={18} />
       </button>
@@ -1118,6 +1162,6 @@ function RoleView({ role, user }) {
   if (role === "teacher") return <TeacherView />;
   if (role === "student") return <StudentView user={user} />;
   if (role === "analyst") return <AnalystView />;
-  return null;
+  return <ErrorScreen code={403} detail={`Unrecognized role: "${role}"`} onHome={() => window.location.reload()} />;
 }
 

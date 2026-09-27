@@ -14,47 +14,50 @@ import { AlertTriangle, Users } from "lucide-react";
 
 export const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5000/api";
 
-// Fixed brand navy for chrome elements (top bars, the settings-cog
-// floating button) — these stay dark in both themes by design, so
+// Carbon Black for chrome elements (top bars, the settings-cog
+// floating button) — these stay black in both themes by design, so
 // they're intentionally NOT part of the LIGHT_COLORS/DARK_COLORS
 // swap below (unlike COLORS.ink, which is body text and DOES need
 // to flip for readability).
-export const BRAND_NAVY = "#16233F";
+export const BRAND_NAVY = "#000000";
 
+// Palette per DESIGN.md — monochrome canvas (warm gray → white →
+// black), flat surfaces, no drop shadows. "brass" keeps its old name
+// (many components reference COLORS.brass) but now points at Carbon
+// Black, matching the design system's "no distinct CTA color —
+// primary actions are a solid dark button" rule.
 export const LIGHT_COLORS = {
-  ink: "#16233F",
-  inkSoft: "#28395C",
-  paper: "#EDF1F0",
-  paperDim: "#E1E6E3",
-  brass: "#B8862E",
-  // Darker brass, used specifically where brass is the TEXT color on
-  // a light (paper/card) background. Plain "brass" only hits ~2.8:1
-  // there — fine as a button/icon color, but fails WCAG AA (4.5:1)
-  // as body text. Not needed on dark backgrounds, where "brass"
-  // already passes on its own.
-  brassText: "#8B6523",
-  risk: "#C2483B",
+  ink: "#000000",
+  inkSoft: "#2F2F2F",
+  paper: "#E5E5E5",
+  paperDim: "#F3F3F3",
+  brass: "#000000",
+  brassText: "#000000",
+  risk: "#B23A2E",
   safe: "#3E7A54",
   teal: "#2C6E82",
-  text: "#1B2433",
-  muted: "#5B6472",
-  line: "#D3D8D2",
+  text: "#000000",
+  muted: "#666666",
+  line: "#C6C6C6",
   cardBg: "#FFFFFF",
 };
 export const DARK_COLORS = {
-  ink: "#0B1220",
-  inkSoft: "#1E2A42",
-  paper: "#141B2B",
-  paperDim: "#1A2334",
-  brass: "#D4A24E",
-  brassText: "#D4A24E", // already passes fine against the dark paper/card background
+  ink: "#F5F5F5",
+  inkSoft: "#D8D8D8",
+  paper: "#111111",
+  paperDim: "#1A1A1A",
+  // A distinct graphite, not the same near-white as "ink" — buttons
+  // need to stand out against the near-black canvas while staying
+  // dark enough that the (hardcoded white) button text stays readable.
+  brass: "#2F2F2F",
+  brassText: "#F5F5F5",
   risk: "#E07A6C",
   safe: "#5FAE7C",
   teal: "#4FA3BE",
-  text: "#E7EAF0",
-  muted: "#9AA7C2",
-  line: "#2A3550",
-  cardBg: "#1B2438",
+  text: "#F5F5F5",
+  muted: "#9A9A9A",
+  line: "#333333",
+  cardBg: "#1A1A1A",
 };
 // A mutable object (not reassigned) so every `COLORS.xxx` reference
 // throughout the app — hundreds of them — picks up new values the
@@ -74,11 +77,27 @@ export function applyTheme(isDark) {
 
 export { apiGet, apiPost, apiPostFile, exportToCsv };
 
+// Tracks whether a user is currently logged in client-side, so a 401
+// from an already-authenticated view (session expired mid-use) can be
+// told apart from a 401 from the login form itself (wrong password —
+// which should NOT trigger a global "log out" redirect).
+let _isAuthenticated = false;
+export function setAuthenticated(v) { _isAuthenticated = v; }
+
+function _apiError(message, status) {
+  const err = new Error(message);
+  err.status = status;
+  if (status === 401 && _isAuthenticated) {
+    window.dispatchEvent(new CustomEvent("ep:session-expired"));
+  }
+  return err;
+}
+
 async function apiGet(path) {
   const res = await fetch(`${API_BASE}${path}`, { credentials: "include" });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || `Request failed (${res.status})`);
+    throw _apiError(body.error || `Request failed (${res.status})`, res.status);
   }
   return res.json();
 }
@@ -91,7 +110,7 @@ async function apiPost(path, body) {
   });
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error || `Request failed (${res.status})`);
+    throw _apiError(errBody.error || `Request failed (${res.status})`, res.status);
   }
   return res.json();
 }
@@ -105,7 +124,7 @@ async function apiPostFile(path, file) {
   });
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error || `Request failed (${res.status})`);
+    throw _apiError(errBody.error || `Request failed (${res.status})`, res.status);
   }
   return res.json();
 }
@@ -200,7 +219,7 @@ function CsvUploadWidget({ onUploaded }) {
         <input type="file" accept=".csv,.json" onChange={e => setFile(e.target.files[0] || null)}
           style={{ fontSize: 12.5, fontFamily: "'IBM Plex Sans', sans-serif" }} />
         <button onClick={handleUpload} disabled={!file || uploading} className="ep-btn ep-btn-primary" style={{
-          padding: "8px 16px", background: COLORS.brass, border: "none", color: "#16233F",
+          padding: "8px 16px", background: COLORS.brass, border: "none", color: "#FFFFFF",
           fontWeight: 600, fontSize: 12.5, cursor: "pointer",
         }}>
           {uploading ? "Uploading…" : "Upload"}

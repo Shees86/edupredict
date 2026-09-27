@@ -46,7 +46,7 @@ function CohortComparisonPanel() {
             <option value="safe">Safe</option>
           </select>
         </div>
-        <button onClick={compare} disabled={loading} className="ep-btn ep-btn-primary" style={{ padding: "7px 16px", background: COLORS.brass, border: "none", color: "#16233F", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+        <button onClick={compare} disabled={loading} className="ep-btn ep-btn-primary" style={{ padding: "7px 16px", background: COLORS.brass, border: "none", color: "#FFFFFF", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
           {loading ? "Comparing…" : "Compare"}
         </button>
       </div>

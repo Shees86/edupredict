@@ -16,6 +16,13 @@ reviewing or extending it.
   grant themselves elevated privileges.
 - Login, registration, and password-reset endpoints are rate-limited
   per IP to slow brute-force and credential-stuffing attempts.
+- **Trade-off, by product decision**: `/api/auth/forgot-password`
+  tells the caller directly whether a username exists (`404` vs a
+  generated reset link), rather than returning an identical response
+  either way. This makes the UX clearer but means the endpoint can be
+  used to enumerate valid usernames — mitigated only by rate limiting.
+  If that trade-off ever needs revisiting, the fix is a single
+  response shape regardless of whether the account exists.
 - Optional TOTP-based two-factor authentication (`pyotp`), compatible
   with Google Authenticator / Authy.
 
