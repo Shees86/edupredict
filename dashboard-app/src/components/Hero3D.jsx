@@ -1,21 +1,35 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
-// Wireframe icosahedron + glowing core + orbiting point field for the
-// landing-page hero. Falls back to nothing if WebGL is unavailable,
-// respects prefers-reduced-motion, and cleans up fully on unmount.
+/**
+ * Wireframe icosahedron with an inner core and a sparse point field.
+ * Reads its colors from CSS custom properties so it follows the theme,
+ * degrades to nothing when WebGL is unavailable, honors reduced motion,
+ * and disposes every GPU resource on unmount.
+ */
 export default function Hero3D({ className, style }) {
   const containerRef = useRef(null);
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container) return undefined;
 
-    let renderer, scene, camera, frameId, resizeObserver;
-    let icosahedron, core, points;
+    let renderer;
+    let scene;
+    let camera;
+    let frameId;
+    let resizeObserver;
     let disposed = false;
+    let icosahedron;
+    let core;
+    let points;
 
-    const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduceMotion =
+      window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const accent = cssColor("--primary", "#c8f24e");
+    const foreground = cssColor("--foreground", "#f2f3ed");
+    const muted = cssColor("--muted-foreground", "#9ca093");
 
     try {
       const width = container.clientWidth || 1;
@@ -30,32 +44,43 @@ export default function Hero3D({ className, style }) {
       renderer.setSize(width, height);
       container.appendChild(renderer.domElement);
 
-      // Wireframe icosahedron — "data structure"
       const icoGeo = new THREE.IcosahedronGeometry(2.1, 1);
-      const icoMat = new THREE.MeshBasicMaterial({ color: 0xb8862e, wireframe: true, transparent: true, opacity: 0.55 });
+      const icoMat = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(accent),
+        wireframe: true,
+        transparent: true,
+        opacity: 0.32,
+      });
       icosahedron = new THREE.Mesh(icoGeo, icoMat);
       scene.add(icosahedron);
 
-      // Glowing core
-      const coreGeo = new THREE.IcosahedronGeometry(0.55, 1);
-      const coreMat = new THREE.MeshBasicMaterial({ color: 0xf4f1e9, transparent: true, opacity: 0.9 });
+      const coreGeo = new THREE.IcosahedronGeometry(0.5, 1);
+      const coreMat = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(foreground),
+        transparent: true,
+        opacity: 0.9,
+      });
       core = new THREE.Mesh(coreGeo, coreMat);
       scene.add(core);
 
-      // Sparse orbiting point field — "data points"
-      const pointCount = 90;
+      const pointCount = 110;
       const positions = new Float32Array(pointCount * 3);
-      for (let i = 0; i < pointCount; i++) {
-        const r = 2.8 + Math.random() * 1.4;
+      for (let i = 0; i < pointCount; i += 1) {
+        const radius = 2.8 + Math.random() * 1.4;
         const theta = Math.random() * Math.PI * 2;
         const phi = Math.acos(2 * Math.random() - 1);
-        positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-        positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-        positions[i * 3 + 2] = r * Math.cos(phi);
+        positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+        positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+        positions[i * 3 + 2] = radius * Math.cos(phi);
       }
       const pointsGeo = new THREE.BufferGeometry();
       pointsGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-      const pointsMat = new THREE.PointsMaterial({ color: 0x9aa7c2, size: 0.045, transparent: true, opacity: 0.7 });
+      const pointsMat = new THREE.PointsMaterial({
+        color: new THREE.Color(muted),
+        size: 0.045,
+        transparent: true,
+        opacity: 0.65,
+      });
       points = new THREE.Points(pointsGeo, pointsMat);
       scene.add(points);
 
@@ -64,7 +89,7 @@ export default function Hero3D({ className, style }) {
       const renderFrame = () => {
         const t = clock.getElapsedTime();
         icosahedron.rotation.y = t * 0.12;
-        icosahedron.rotation.x = t * 0.06;
+        icosahedron.rotation.x = t * 0.05;
         core.rotation.y = -t * 0.2;
         points.rotation.y = t * 0.04;
         renderer.render(scene, camera);
@@ -92,17 +117,17 @@ export default function Hero3D({ className, style }) {
       });
       resizeObserver.observe(container);
     } catch {
-      // WebGL unavailable or failed — fail silently, no 3D visual shown.
+      // WebGL unavailable — the surrounding layout stands on its own.
     }
 
     return () => {
       disposed = true;
       if (frameId) cancelAnimationFrame(frameId);
       if (resizeObserver) resizeObserver.disconnect();
-      [icosahedron, core, points].forEach((obj) => {
-        if (!obj) return;
-        obj.geometry && obj.geometry.dispose();
-        obj.material && obj.material.dispose();
+      [icosahedron, core, points].forEach((object) => {
+        if (!object) return;
+        if (object.geometry) object.geometry.dispose();
+        if (object.material) object.material.dispose();
       });
       if (renderer) {
         renderer.dispose();
@@ -114,4 +139,23 @@ export default function Hero3D({ className, style }) {
   }, []);
 
   return <div ref={containerRef} className={className} style={{ width: "100%", height: "100%", ...style }} />;
+}
+
+/**
+ * Resolve a CSS custom property to something THREE.Color can parse.
+ * The design tokens are oklch(), which Three.js doesn't understand, so
+ * we let the canvas 2D parser normalize it to rgb().
+ */
+function cssColor(name, fallback) {
+  if (typeof window === "undefined") return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  if (!value) return fallback;
+  try {
+    const ctx = document.createElement("canvas").getContext("2d");
+    if (!ctx) return fallback;
+    ctx.fillStyle = value;
+    return ctx.fillStyle || fallback;
+  } catch {
+    return fallback;
+  }
 }

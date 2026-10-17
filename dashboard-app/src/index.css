@@ -1,21 +1,231 @@
-html {
-  scroll-behavior: smooth;
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------
+   EduPredict — design tokens
+   Dark-first "signal" console: warm ink canvas, one lime accent that
+   marks action and live data, coral/mint reserved for risk semantics.
+   Light mode is a first-class companion, not an afterthought.
+   ------------------------------------------------------------------ */
+
+:root {
+  --radius: 0.625rem;
+
+  --background: oklch(0.152 0.004 110);
+  --foreground: oklch(0.945 0.006 100);
+  --card: oklch(0.185 0.005 110);
+  --card-foreground: oklch(0.945 0.006 100);
+  --popover: oklch(0.198 0.005 110);
+  --popover-foreground: oklch(0.945 0.006 100);
+  --primary: oklch(0.905 0.166 118);
+  --primary-foreground: oklch(0.175 0.02 120);
+  --secondary: oklch(0.245 0.006 110);
+  --secondary-foreground: oklch(0.93 0.006 100);
+  --muted: oklch(0.235 0.006 110);
+  --muted-foreground: oklch(0.66 0.01 100);
+  --accent: oklch(0.27 0.008 110);
+  --accent-foreground: oklch(0.95 0.006 100);
+  --destructive: oklch(0.69 0.17 25);
+  --destructive-foreground: oklch(0.16 0.01 25);
+  --border: oklch(0.275 0.006 110);
+  --input: oklch(0.295 0.006 110);
+  --ring: oklch(0.84 0.15 118);
+
+  --risk: oklch(0.71 0.17 25);
+  --risk-soft: oklch(0.32 0.055 25);
+  --safe: oklch(0.8 0.12 165);
+  --safe-soft: oklch(0.3 0.045 165);
+  --warn: oklch(0.83 0.14 85);
+
+  --chart-1: oklch(0.905 0.166 118);
+  --chart-2: oklch(0.8 0.12 165);
+  --chart-3: oklch(0.71 0.17 25);
+  --chart-4: oklch(0.72 0.09 240);
+  --chart-5: oklch(0.83 0.14 85);
+  --chart-grid: oklch(0.3 0.006 110);
+
+  --sidebar: oklch(0.135 0.004 110);
+  --sidebar-foreground: oklch(0.9 0.006 100);
+  --sidebar-border: oklch(0.255 0.006 110);
+
+  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", monospace;
 }
-html, body {
-  overflow-x: hidden;
+
+html.light {
+  --background: oklch(0.972 0.004 100);
+  --foreground: oklch(0.195 0.008 110);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.195 0.008 110);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.195 0.008 110);
+  --primary: oklch(0.28 0.07 122);
+  --primary-foreground: oklch(0.98 0.015 110);
+  --secondary: oklch(0.94 0.005 100);
+  --secondary-foreground: oklch(0.22 0.008 110);
+  --muted: oklch(0.945 0.004 100);
+  --muted-foreground: oklch(0.47 0.008 100);
+  --accent: oklch(0.93 0.006 100);
+  --accent-foreground: oklch(0.2 0.008 110);
+  --destructive: oklch(0.55 0.19 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.89 0.004 100);
+  --input: oklch(0.87 0.005 100);
+  --ring: oklch(0.45 0.1 120);
+
+  --risk: oklch(0.52 0.19 27);
+  --risk-soft: oklch(0.955 0.03 27);
+  --safe: oklch(0.46 0.1 165);
+  --safe-soft: oklch(0.955 0.025 165);
+  --warn: oklch(0.6 0.12 80);
+
+  --chart-1: oklch(0.42 0.1 122);
+  --chart-2: oklch(0.5 0.11 165);
+  --chart-3: oklch(0.52 0.19 27);
+  --chart-4: oklch(0.5 0.1 240);
+  --chart-5: oklch(0.62 0.12 80);
+  --chart-grid: oklch(0.9 0.004 100);
+
+  --sidebar: oklch(0.995 0 0);
+  --sidebar-foreground: oklch(0.24 0.008 110);
+  --sidebar-border: oklch(0.9 0.004 100);
 }
-::-webkit-scrollbar {
-  width: 0px;
-  height: 0px;
-  background: transparent;
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-risk: var(--risk);
+  --color-risk-soft: var(--risk-soft);
+  --color-safe: var(--safe);
+  --color-safe-soft: var(--safe-soft);
+  --color-warn: var(--warn);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-grid: var(--chart-grid);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 10px);
 }
-* {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 35%, transparent);
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  background: #EDF1F0;
+
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle hairline grid used behind the landing hero and auth rail. */
+@utility bg-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, var(--foreground) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 7%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@keyframes ep-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ep-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@utility animate-rise {
+  animation: ep-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility animate-fade {
+  animation: ep-fade 0.3s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

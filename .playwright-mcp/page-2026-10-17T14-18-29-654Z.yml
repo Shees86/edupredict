@@ -1,0 +1,37 @@
+- generic [ref=f1e145]:
+  - complementary [ref=f1e146]:
+    - generic [ref=f1e147]: EduPredict
+    - generic [ref=f1e152]:
+      - generic [ref=f1e153]: Academic analytics portal
+      - heading "Spot at-risk students before it's too late." [level=2] [ref=f1e155]
+      - paragraph [ref=f1e156]: Hadoop-scale processing meets dropout-risk models, pathway predictors, and live cohort analytics — one workspace per role.
+    - list [ref=f1e157]:
+      - listitem [ref=f1e158]: Dropout risk scored from attendance, scores and LMS engagement
+      - listitem [ref=f1e162]: Field, university and CGPA-trend predictors for every student
+      - listitem [ref=f1e166]: Live alerts the moment a cohort crosses the line
+  - main [ref=f1e170]:
+    - button "Switch to light mode" [ref=f1e172]
+    - generic [ref=f1e173]:
+      - button "Back to home" [ref=f1e174]
+      - generic [ref=f1e177]:
+        - generic [ref=f1e178]:
+          - heading "Welcome back" [level=1] [ref=f1e183]
+          - paragraph [ref=f1e184]: Sign in to your EduPredict workspace.
+        - generic [ref=f1e185]:
+          - button "Sign in" [pressed] [ref=f1e186]
+          - button "Create account" [ref=f1e187]
+        - generic [ref=f1e188]:
+          - generic [ref=f1e189]:
+            - generic [ref=f1e190]: Username or Student ID
+            - textbox "Username or Student ID" [active] [ref=f1e191]:
+              - /placeholder: Your username
+              - text: admin
+          - generic [ref=f1e192]:
+            - generic [ref=f1e193]:
+              - generic [ref=f1e194]: Password
+              - button "Forgot password?" [ref=f1e195]
+            - textbox "Password" [ref=f1e196]:
+              - /placeholder: ••••••••
+              - text: demo-password
+          - button "Sign in" [ref=f1e197]
+      - paragraph [ref=f1e198]: Protected by role-based access control and optional two-factor authentication.
