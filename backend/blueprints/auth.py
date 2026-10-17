@@ -29,12 +29,25 @@ def register():
         return jsonify({"error": "Password must be at least 6 characters"}), 400
 
     if role == "student":
+        # Ownership is: (1) Student ID is on the roster, (2) signup email
+        # matches the email on that roster row when one is stored,
+        # (3) an admin still has to approve the account before login.
+        # Same error text in every failure so sequential IDs cannot be
+        # probed, and "first person to type STU1000" cannot log in.
+        student_denied = (
+            "We couldn't create this student account. Confirm your Student ID "
+            "and the email on file with your institution, or ask an administrator."
+        )
+        if not email:
+            return jsonify({"error": student_denied}), 400
         student_record = db.students_col.find_one({"student_id": username}, {"_id": 0})
         if not student_record:
-            return jsonify({"error": "Student ID not found in institutional records. Please verify with your faculty."}), 400
-        existing_user = db.users_col.find_one({"username": username})
-        if existing_user:
-            return jsonify({"error": "An account has already been registered/claimed for this Student ID."}), 400
+            return jsonify({"error": student_denied}), 400
+        if db.users_col.find_one({"username": username}):
+            return jsonify({"error": student_denied}), 400
+        on_file = db.roster_email(student_record)
+        if on_file and on_file != email.lower():
+            return jsonify({"error": student_denied}), 400
 
     user_id, err = db.create_user(username, password, role, full_name, email)
     if err:
@@ -139,32 +152,31 @@ def me():
     return jsonify({"user": user}), 200
 
 
+_RESET_ACK = "If an account exists for that username, a reset link has been sent."
+
+
 @auth_bp.route("/forgot-password", methods=["POST"])
 @rate_limit(max_attempts=5, window_seconds=60)
 def forgot_password():
     data = request.get_json(force=True)
     username = data.get("username", "")
 
-    # NOTE: this intentionally reveals whether an account exists,
-    # per product decision — trades away protection against account
-    # enumeration for clearer UX. See docs/SECURITY.md.
-    if not db.users_col.find_one({"username": username}):
-        return jsonify({"error": f'No account found for "{username}".'}), 404
+    # Same response whether or not the user exists, and never include
+    # the token in the JSON — it stays in Mongo and is emailed when SMTP
+    # is configured. Returning the token in the browser was an account-
+    # takeover path whenever email was unset (typical on free hosting).
+    if db.users_col.find_one({"username": username}):
+        token = db.create_reset_token(username)
+        if token:
+            email, _ = db.get_user_email_and_prefs(username)
+            sent = bool(email) and emailer.send_password_reset_email(email, token, FRONTEND_ORIGIN)
+            if not sent:
+                print(
+                    "[auth] Password reset token stored server-side only "
+                    "(no email on file, SMTP not configured, or send failed)."
+                )
 
-    token = db.create_reset_token(username)
-    if not token:
-        return jsonify({"error": f'No account found for "{username}".'}), 404
-
-    email, _ = db.get_user_email_and_prefs(username)
-    sent = False
-    if email:
-        sent = emailer.send_password_reset_email(email, token, FRONTEND_ORIGIN)
-
-    response = {"message": "Reset link generated."}
-    if not sent:
-        # No SMTP configured — return the token directly for local testing.
-        response["dev_reset_token"] = token
-    return jsonify(response), 200
+    return jsonify({"message": _RESET_ACK}), 200
 
 
 @auth_bp.route("/reset-password", methods=["POST"])

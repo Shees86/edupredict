@@ -16,10 +16,10 @@ audit_col = db["audit_log"]
 goals_col = db["goals"]
 messages_col = db["messages"]
 
-# Roles that require admin approval before they can log in. Student
-# accounts skip this — they're already gated by having to match an
-# existing roster record (see /api/auth/register in app.py).
-ROLES_REQUIRING_APPROVAL = {"teacher", "analyst"}
+# Roles that require admin approval before they can log in. Students
+# must also be on the institutional roster and prove ownership of that
+# Student ID (matching roster email) — see /api/auth/register.
+ROLES_REQUIRING_APPROVAL = {"teacher", "analyst", "student"}
 
 
 def init_indexes():
@@ -97,6 +97,17 @@ def upsert_student(student_doc):
 
 def get_student(student_id):
     return students_col.find_one({"student_id": student_id}, {"_id": 0})
+
+
+def roster_email(student_record):
+    """Email on file for a roster row, if the institution stored one."""
+    if not student_record:
+        return ""
+    for key in ("email", "student_email", "contact_email"):
+        val = str(student_record.get(key) or "").strip()
+        if val:
+            return val.lower()
+    return ""
 
 
 def list_students(filter_query=None, limit=10):

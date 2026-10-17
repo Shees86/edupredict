@@ -4,10 +4,11 @@ import secrets
 import sys
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 import db
 from extensions import stats
-from config import FRONTEND_ORIGINS
+from config import FRONTEND_ORIGINS, trust_proxy
 
 from blueprints.auth import auth_bp
 from blueprints.admin import admin_bp
@@ -43,6 +44,13 @@ app.config.update(
     MAX_CONTENT_LENGTH=5 * 1024 * 1024,    # 5 MB cap on any request body — blocks oversized upload abuse
 )
 CORS(app, supports_credentials=True, origins=FRONTEND_ORIGINS)  # explicit allow-list — never a wildcard "*"
+
+# Only honor X-Forwarded-For / X-Forwarded-Proto when we actually sit
+# behind a known reverse proxy. Otherwise a client could spoof those
+# headers and bypass per-IP rate limits. ProxyFix uses the *rightmost*
+# hops (the ones the proxy appended), not the left-most attacker value.
+if trust_proxy():
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
 
 # Tracks request volume/duration for /api/system/stats.

@@ -93,7 +93,8 @@ python3 spark/pyspark_pipeline.py
 
 There's no seed data — the database starts empty.
 
-- **Teacher / Student / Analyst**: self-register from the login screen.
+- **Teacher / Analyst**: self-register from the login screen (admin approval required before login).
+- **Student**: Student ID must already be on the roster, signup email must match the email on that roster row when one is stored, and an admin must approve the account before login.
 - **Admin**: gated behind an `ADMIN_SETUP_KEY` environment variable (so
   no one can grant themselves admin through the UI). Set the variable,
   then:

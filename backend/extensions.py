@@ -31,7 +31,11 @@ def rate_limit(max_attempts=8, window_seconds=60):
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            client_ip = request.headers.get("X-Forwarded-For", request.remote_addr or "unknown").split(",")[0].strip()
+            # Never read X-Forwarded-For here. If we are behind a trusted
+            # proxy, ProxyFix (see app.py) has already set remote_addr to
+            # the real client. Otherwise remote_addr is the TCP peer, and
+            # a caller-supplied X-Forwarded-For header is ignored.
+            client_ip = request.remote_addr or "unknown"
             key = f"{fn.__name__}:{client_ip}"
             now = time.time()
             attempts = [t for t in _rate_limit_hits.get(key, []) if now - t < window_seconds]

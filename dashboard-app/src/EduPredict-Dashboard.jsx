@@ -185,7 +185,12 @@ function getGlobalCss() {
 
 export default function EduPredictDashboard() {
   const [user, setUser] = useState(null);
-  const [view, setView] = useState("landing"); // "landing" | "login" | "register"
+  const [view, setView] = useState(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("reset_token")) {
+      return "login";
+    }
+    return "landing";
+  }); // "landing" | "login" | "register"
   const [sessionExpired, setSessionExpired] = useState(false);
   const liveAlert = useLiveAlerts(!!user && ["admin", "teacher", "analyst"].includes(user?.role));
   const [dismissedAlert, setDismissedAlert] = useState(null);
@@ -541,8 +546,10 @@ function LoginScreen({ onLogin, initialMode = "login", onBack, sessionExpired, o
   const [submitting, setSubmitting] = useState(false);
   const [needs2fa, setNeeds2fa] = useState(false);
   const [totpCode, setTotpCode] = useState("");
-  const [resetToken, setResetToken] = useState("");
-  const [devResetToken, setDevResetToken] = useState("");
+  const [resetToken, setResetToken] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("reset_token") || "";
+  });
 
   const roles = [
     { id: "teacher", label: "Teacher", icon: BookOpen },

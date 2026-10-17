@@ -15,14 +15,16 @@ reviewing or extending it.
   environment variable, so no client-side path exists for a user to
   grant themselves elevated privileges.
 - Login, registration, and password-reset endpoints are rate-limited
-  per IP to slow brute-force and credential-stuffing attempts.
-- **Trade-off, by product decision**: `/api/auth/forgot-password`
-  tells the caller directly whether a username exists (`404` vs a
-  generated reset link), rather than returning an identical response
-  either way. This makes the UX clearer but means the endpoint can be
-  used to enumerate valid usernames — mitigated only by rate limiting.
-  If that trade-off ever needs revisiting, the fix is a single
-  response shape regardless of whether the account exists.
+  per IP to slow brute-force and credential-stuffing attempts. The
+  limiter uses the TCP peer address; `X-Forwarded-For` is only applied
+  (via Werkzeug ProxyFix, last hop) when `TRUST_PROXY` is on or the
+  process is running on Render.
+- `/api/auth/forgot-password` always returns the same success message
+  and never includes the reset token in the JSON body. The token is
+  stored server-side and emailed when SMTP is configured.
+- Student self-registration requires a matching roster Student ID, an
+  email that matches the roster when one is on file, and admin approval
+  before the account can log in.
 - Optional TOTP-based two-factor authentication (`pyotp`), compatible
   with Google Authenticator / Authy.
 
