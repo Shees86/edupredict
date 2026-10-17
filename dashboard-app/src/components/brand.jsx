@@ -1,9 +1,9 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Brand mark: a filled lime square with a cut corner and a notch drawn
- * from the "graduation step" motif. Pure SVG so it stays crisp at any
- * size and inherits the current color tokens.
+ * Brand mark: a lime tile carrying three ascending bars — the "signal"
+ * rising out of the noise. SVG so it stays crisp at any size and reads
+ * from the theme tokens rather than hard-coded paint.
  */
 export function LogoMark({ className }) {
   return (
@@ -13,21 +13,9 @@ export function LogoMark({ className }) {
       className={cn("size-7 shrink-0", className)}
     >
       <rect width="32" height="32" rx="9" fill="var(--primary)" />
-      <path
-        d="M9 21.5V10.5h12"
-        stroke="var(--primary-foreground)"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-      <path
-        d="M9 16h7.5"
-        stroke="var(--primary-foreground)"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        opacity="0.55"
-      />
+      <rect x="8" y="17" width="3.4" height="7" rx="1.2" fill="var(--primary-foreground)" opacity="0.55" />
+      <rect x="14.3" y="13" width="3.4" height="11" rx="1.2" fill="var(--primary-foreground)" opacity="0.78" />
+      <rect x="20.6" y="8" width="3.4" height="16" rx="1.2" fill="var(--primary-foreground)" />
     </svg>
   );
 }

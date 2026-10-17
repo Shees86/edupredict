@@ -1,0 +1,92 @@
+- generic [ref=f3e1]:
+  - generic [ref=f3e205]:
+    - generic [ref=f3e206]:
+      - complementary [ref=f3e207]:
+        - generic [ref=f3e215]:
+          - generic [ref=f3e216]: EduPredict
+          - generic [ref=f3e217]: Academic intelligence
+        - navigation "Primary" [ref=f3e218]:
+          - generic [ref=f3e219]:
+            - generic [ref=f3e220]: Workspace
+            - list [ref=f3e221]:
+              - listitem [ref=f3e222]:
+                - button "My standing" [ref=f3e223]
+              - listitem [ref=f3e228]:
+                - button "Goals & badges" [active] [ref=f3e229]
+              - listitem [ref=f3e234]:
+                - button "Pathway tools" [ref=f3e235]
+          - generic [ref=f3e240]:
+            - generic [ref=f3e241]: Account
+            - list [ref=f3e242]:
+              - listitem [ref=f3e243]:
+                - button "Settings & security" [ref=f3e244]
+              - listitem [ref=f3e248]:
+                - button "Feedback & support" [ref=f3e249]
+        - generic [ref=f3e258]:
+          - generic [ref=f3e259]: Ay
+          - generic [ref=f3e260]:
+            - generic [ref=f3e261]: Ayesha Khan
+            - generic [ref=f3e262]: Student · ST0001
+          - button "Sign out" [ref=f3e263]
+      - generic [ref=f3e264]:
+        - banner [ref=f3e265]:
+          - generic [ref=f3e266]:
+            - generic [ref=f3e267]:
+              - generic [ref=f3e268]: Student portal
+              - generic [ref=f3e269]: /
+              - generic [ref=f3e270]: Goals & badges
+            - generic [ref=f3e271]:
+              - generic [ref=f3e272]: Live monitoring
+              - button "Switch to light mode" [ref=f3e276]
+              - button "Ay Ayesha Khan" [ref=f3e277]:
+                - generic [ref=f3e278]: Ay
+                - generic [ref=f3e279]: Ayesha Khan
+        - main [ref=f3e280]:
+          - generic [ref=f3e422]:
+            - generic [ref=f3e424]:
+              - generic [ref=f3e425]: Student portal
+              - heading "Goals & achievements" [level=1] [ref=f3e426]
+              - paragraph [ref=f3e427]: Set a target for the term, then let your metrics — and the badges they unlock — do the tracking.
+            - generic [ref=f3e428]:
+              - generic [ref=f3e429]:
+                - generic [ref=f3e432]:
+                  - heading "My goal" [level=2] [ref=f3e433]
+                  - paragraph [ref=f3e434]: One target at a time — pick the metric that matters most
+                - generic [ref=f3e440]:
+                  - generic [ref=f3e441]:
+                    - generic [ref=f3e442]:
+                      - generic [ref=f3e443]: Attendance
+                      - generic [ref=f3e444]: 97%
+                    - generic [ref=f3e445]:
+                      - text: "92.4"
+                      - generic [ref=f3e446]: / 95 target
+                    - progressbar [ref=f3e447]
+                  - generic [ref=f3e449]:
+                    - generic [ref=f3e450]:
+                      - text: Metric
+                      - combobox [ref=f3e451]:
+                        - generic: Attendance %
+                    - generic [ref=f3e454]:
+                      - text: Target
+                      - spinbutton [ref=f3e455]: "80"
+                    - button "Set goal" [ref=f3e456]
+              - generic [ref=f3e457]:
+                - generic [ref=f3e460]:
+                  - heading "Achievements" [level=2] [ref=f3e461]
+                  - paragraph [ref=f3e462]: Earned automatically from your record
+                - list [ref=f3e468]:
+                  - listitem [ref=f3e469]:
+                    - generic [ref=f3e477]:
+                      - generic [ref=f3e478]: Perfect attendance
+                      - paragraph [ref=f3e479]: Attended every scheduled class this term.
+                  - listitem [ref=f3e480]:
+                    - generic [ref=f3e488]:
+                      - generic [ref=f3e489]: GPA climber
+                      - paragraph [ref=f3e490]: GPA improved for two consecutive semesters.
+                  - listitem [ref=f3e491]:
+                    - generic [ref=f3e499]:
+                      - generic [ref=f3e500]: Engaged learner
+                      - paragraph [ref=f3e501]: 15+ LMS logins per week on average.
+    - button "Send feedback" [ref=f3e417]
+    - region "Notifications alt+T"
+  - generic [aria-hidden] [ref=f3e420]: "0"
