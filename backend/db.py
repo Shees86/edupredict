@@ -4,6 +4,7 @@ import os
 import secrets
 from datetime import datetime, timedelta
 from pymongo import MongoClient
+from pymongo.errors import DuplicateKeyError
 from werkzeug.security import generate_password_hash, check_password_hash
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017/")
 DB_NAME = os.environ.get("MONGO_DB_NAME", "edupredict")
@@ -41,6 +42,8 @@ STUDENT_FIELDS = {
     "email": str,
     "student_email": str,
     "contact_email": str,
+    "school_id": str,
+    "class_id": str,
 }
 
 
@@ -90,26 +93,78 @@ def verify_user(username, password):
         "username": user["username"],
         "role": user["role"],
         "full_name": user.get("full_name", ""),
+        "school_id": user.get("school_id"),
+        "class_id": user.get("class_id"),
         "totp_enabled": user.get("totp_enabled", False),
     }
 
 
 def list_pending_users():
-    items = list(users_col.find({"status": "pending"}, {"password_hash": 0}))
+    unassigned_staff = [
+        {
+            "status": "approved",
+            "role": "teacher",
+            "$or": [
+                {"school_id": {"$in": [None, ""]}},
+                {"class_id": {"$in": [None, ""]}},
+            ],
+        },
+        {
+            "status": "approved",
+            "role": "analyst",
+            "school_id": {"$in": [None, ""]},
+        },
+    ]
+    items = list(users_col.find(
+        {"$or": [{"status": "pending"}, *unassigned_staff]},
+        {"password_hash": 0},
+    ))
     for it in items:
         it["_id"] = str(it["_id"])
+        if it.get("status") == "approved":
+            it["needs_scope_assignment"] = True
     return items
 
 
-def approve_user(username):
-    users_col.update_one({"username": username}, {"$set": {"status": "approved"}})
+def approve_user(username, school_id=None, class_id=None):
+    fields = {"status": "approved"}
+    if school_id is not None:
+        fields["school_id"] = school_id
+    if class_id is not None:
+        fields["class_id"] = class_id
+    users_col.update_one({"username": username}, {"$set": fields})
 
 
 def reject_user(username):
     users_col.delete_one({"username": username, "status": "pending"})
 
 
-def upsert_student(student_doc):
+def student_scope_for_user(username, role):
+    if role == "admin":
+        return {}
+
+    user = users_col.find_one(
+        {"username": username},
+        {"_id": 0, "role": 1, "school_id": 1, "class_id": 1},
+    )
+    if not user or user.get("role") != role:
+        return None
+
+    school_id = user.get("school_id")
+    if not isinstance(school_id, str) or not school_id.strip():
+        return None
+    scope = {"school_id": school_id}
+    if role == "teacher":
+        class_id = user.get("class_id")
+        if not isinstance(class_id, str) or not class_id.strip():
+            return None
+        scope["class_id"] = class_id
+    elif role != "analyst":
+        return None
+    return scope
+
+
+def upsert_student(student_doc, scope=None):
     if not isinstance(student_doc, dict):
         raise ValueError("Student record must be an object")
 
@@ -136,15 +191,22 @@ def upsert_student(student_doc):
         elif not isinstance(value, expected_type):
             raise ValueError(f"{field} must be a string")
 
-    students_col.update_one(
-        {"student_id": student_id},
-        {"$set": student_doc},
-        upsert=True,
-    )
+    query = {"student_id": student_id}
+    if scope:
+        query.update(scope)
+    try:
+        students_col.update_one(query, {"$set": student_doc}, upsert=True)
+    except DuplicateKeyError as error:
+        if scope:
+            raise PermissionError("Student is outside your assigned class or school") from error
+        raise
 
 
-def get_student(student_id):
-    return students_col.find_one({"student_id": student_id}, {"_id": 0})
+def get_student(student_id, scope=None):
+    query = {"student_id": student_id}
+    if scope:
+        query.update(scope)
+    return students_col.find_one(query, {"_id": 0})
 
 
 def roster_email(student_record):

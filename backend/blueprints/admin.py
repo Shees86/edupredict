@@ -1,5 +1,5 @@
 import time
-from flask import Blueprint, jsonify, session
+from flask import Blueprint, jsonify, request, session
 import db
 from extensions import login_required, stats
 
@@ -16,8 +16,42 @@ def list_pending_users():
 @admin_bp.route("/admin/approve/<username>", methods=["POST"])
 @login_required(roles=["admin"])
 def approve_pending_user(username):
-    db.approve_user(username)
-    db.log_action(session["user"]["username"], "admin", "approve-user", target=username)
+    pending_user = db.users_col.find_one(
+        {"username": username},
+        {"_id": 0, "role": 1, "status": 1},
+    )
+    if not pending_user or pending_user.get("status") not in ("pending", "approved"):
+        return jsonify({"error": "Pending account not found"}), 404
+
+    role = pending_user.get("role")
+    if role not in ("teacher", "analyst", "student"):
+        return jsonify({"error": "This account cannot be approved here"}), 400
+    if pending_user["status"] == "approved" and role not in ("teacher", "analyst"):
+        return jsonify({"error": "This account does not need a staff assignment"}), 400
+
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"error": "Expected a JSON object"}), 400
+    required_fields = {
+        "teacher": {"school_id", "class_id"},
+        "analyst": {"school_id"},
+    }.get(role, set())
+    if set(data) != required_fields:
+        if required_fields:
+            return jsonify({"error": "Assign this account to its school and class before approval"}), 400
+        if data:
+            return jsonify({"error": "This account does not accept a school or class assignment"}), 400
+
+    assignment = {}
+    for field in required_fields:
+        value = data.get(field)
+        if not isinstance(value, str) or not value.strip() or len(value.strip()) > 128:
+            return jsonify({"error": f"{field} must be a non-empty string of at most 128 characters"}), 400
+        assignment[field] = value.strip()
+
+    db.approve_user(username, **assignment)
+    action = "assign-staff-scope" if pending_user["status"] == "approved" else "approve-user"
+    db.log_action(session["user"]["username"], "admin", action, target=username)
     return jsonify({"message": f"{username} approved."}), 200
 
 

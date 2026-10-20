@@ -44,6 +44,7 @@ import { CsvUpload } from "@/features/dashboard/CsvUpload";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -409,12 +410,39 @@ export function AdminGovernance() {
 function PendingApprovals() {
   const pending = useAsync(listPendingUsers);
   const [busy, setBusy] = React.useState(null);
+  const [assignments, setAssignments] = React.useState({});
 
-  async function decide(username, approve) {
+  function updateAssignment(username, field, value) {
+    setAssignments((current) => ({
+      ...current,
+      [username]: { ...current[username], [field]: value },
+    }));
+  }
+
+  async function decide(user, approve) {
+    const assignment = assignments[user.username] || {};
+    if (approve && user.role === "teacher" && (!assignment.school_id?.trim() || !assignment.class_id?.trim())) {
+      toast.error("Assign the teacher to a school and class before approval.");
+      return;
+    }
+    if (approve && user.role === "analyst" && !assignment.school_id?.trim()) {
+      toast.error("Assign the analyst to a school before approval.");
+      return;
+    }
+
+    const username = user.username;
     setBusy(username);
     try {
-      await decidePendingUser(username, approve);
-      toast.success(approve ? `${username} approved` : `${username} rejected`);
+      await decidePendingUser(
+        username,
+        approve,
+        user.role === "teacher" || user.role === "analyst" ? assignment : {}
+      );
+      toast.success(
+        user.needs_scope_assignment
+          ? `${username} scope assigned`
+          : approve ? `${username} approved` : `${username} rejected`
+      );
       pending.refresh();
     } catch (err) {
       toast.error(err.message);
@@ -430,7 +458,7 @@ function PendingApprovals() {
       <CardHeader className="pb-3">
         <SectionHeader
           title="Pending approvals"
-          description="Teacher, student and analyst signups wait here"
+          description="Review signups and assign scopes to existing staff"
           actions={
             rows.length > 0 ? (
               <Badge variant="warn" className="font-mono tnum">
@@ -454,34 +482,57 @@ function PendingApprovals() {
         {rows.length > 0 ? (
           <ul className="divide-y divide-border/50">
             {rows.map((user) => (
-              <li key={user.username} className="flex items-center justify-between gap-3 py-2.5">
+              <li key={user.username} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <div className="truncate font-mono text-[0.8125rem]">{user.username}</div>
                   <div className="truncate text-[0.6875rem] capitalize text-muted-foreground">
                     {user.role} · {user.full_name || "No name given"}
+                    {user.needs_scope_assignment ? " · scope required" : ""}
                   </div>
                 </div>
-                <div className="flex shrink-0 gap-1.5">
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    className="border-safe/40 text-safe hover:bg-safe/10 hover:text-safe"
-                    onClick={() => decide(user.username, true)}
-                    disabled={busy === user.username}
-                    aria-label={`Approve ${user.username}`}
-                  >
-                    <Check className="size-3.5" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    className="border-risk/40 text-risk hover:bg-risk/10 hover:text-risk"
-                    onClick={() => decide(user.username, false)}
-                    disabled={busy === user.username}
-                    aria-label={`Reject ${user.username}`}
-                  >
-                    <X className="size-3.5" />
-                  </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {user.role === "teacher" || user.role === "analyst" ? (
+                    <Input
+                      className="h-8 w-32 text-xs"
+                      aria-label={`School ID for ${user.username}`}
+                      placeholder="School ID"
+                      value={assignments[user.username]?.school_id ?? user.school_id ?? ""}
+                      onChange={(event) => updateAssignment(user.username, "school_id", event.target.value)}
+                    />
+                  ) : null}
+                  {user.role === "teacher" ? (
+                    <Input
+                      className="h-8 w-32 text-xs"
+                      aria-label={`Class ID for ${user.username}`}
+                      placeholder="Class ID"
+                      value={assignments[user.username]?.class_id ?? user.class_id ?? ""}
+                      onChange={(event) => updateAssignment(user.username, "class_id", event.target.value)}
+                    />
+                  ) : null}
+                  <div className="ml-auto flex shrink-0 gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      className="border-safe/40 text-safe hover:bg-safe/10 hover:text-safe"
+                      onClick={() => decide(user, true)}
+                      disabled={busy === user.username}
+                      aria-label={`Approve ${user.username}`}
+                    >
+                      <Check className="size-3.5" />
+                    </Button>
+                    {!user.needs_scope_assignment ? (
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        className="border-risk/40 text-risk hover:bg-risk/10 hover:text-risk"
+                        onClick={() => decide(user, false)}
+                        disabled={busy === user.username}
+                        aria-label={`Reject ${user.username}`}
+                      >
+                        <X className="size-3.5" />
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               </li>
             ))}

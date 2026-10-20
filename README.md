@@ -129,10 +129,12 @@ Each script writes its `.pkl` / `_metrics.json` output into `backend/`.
 | `/api/auth/login` | POST | any | Log in, sets session cookie |
 | `/api/auth/logout` | POST | any | Log out |
 | `/api/auth/me` | GET | any | Current session user |
-| `/api/students` | GET/POST | admin/teacher/analyst | List / upsert students |
-| `/api/students/<id>` | GET | all | One student's record |
+| `/api/students` | GET | admin/teacher/analyst | Admin access is unrestricted; teachers are limited to their assigned school and class, analysts to their assigned school |
+| `/api/students` | POST | admin/teacher | Admin access is unrestricted; teachers can only create or update records in their assigned class |
+| `/api/students/<id>` | GET | all | One student's record; staff access follows their school/class assignment |
+| `/api/admin/approve/<username>` | POST | admin | Assign teachers a school and class, and analysts a school, while approving their account |
 | `/api/cohort/compare` | GET | admin/analyst | Compare two student cohorts |
-| `/api/data/ingest` | POST | admin/teacher | Batch CSV/JSON upload |
+| `/api/data/ingest` | POST | admin/teacher | Batch CSV/JSON upload; teacher uploads are limited to their assigned class |
 | `/api/predict` | POST | admin/teacher/analyst | Dropout-risk prediction |
 | `/api/predict/field` | POST | any | Field & college predictor |
 | `/api/predict/university` | POST | any | University admission predictor |
@@ -150,6 +152,8 @@ Each script writes its `.pkl` / `_metrics.json` output into `backend/`.
 | `/api/messages` | GET/POST | admin/teacher/student | In-app messaging |
 | `/api/audit-log` | GET | admin | Admin action history |
 | `/api/health` | GET | — | Health check |
+
+Roster records use `school_id` and `class_id` to enforce staff access. Include these columns when an administrator imports existing roster data; teachers receive their assigned values on uploads, and records outside their class cannot be overwritten.
 
 ## Security
 

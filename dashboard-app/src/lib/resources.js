@@ -54,8 +54,11 @@ export async function listPendingUsers() {
   return data.pending || [];
 }
 
-export async function decidePendingUser(username, approve) {
-  return apiPost(`/admin/${approve ? "approve" : "reject"}/${encodeURIComponent(username)}`, {});
+export async function decidePendingUser(username, approve, assignment = {}) {
+  return apiPost(
+    `/admin/${approve ? "approve" : "reject"}/${encodeURIComponent(username)}`,
+    approve ? assignment : {}
+  );
 }
 
 export async function listAuditLog() {
