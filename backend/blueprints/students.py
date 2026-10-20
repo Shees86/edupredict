@@ -78,25 +78,11 @@ def compare_cohorts():
             conditions.append({"gender": gender})
         return {"$and": conditions} if conditions else {}
 
-    def summarize(filter_query):
-        rows = db.list_students(filter_query=filter_query, limit=None)
-        n = len(rows)
-        if n == 0:
-            return {"count": 0}
-        avg = lambda key: round(sum((r.get(key) or 0) for r in rows) / n, 2)
-        high_risk = sum(1 for r in rows if r.get("dropout_risk") == 1)
-        return {
-            "count": n,
-            "avg_attendance": avg("attendance_rate"),
-            "avg_score": avg("avg_test_score"),
-            "avg_gpa": avg("previous_semester_gpa"),
-            "high_risk_pct": round(100 * high_risk / n, 1),
-        }
-
-    return jsonify({
-        "group_a": summarize(build_filter("group_a")),
-        "group_b": summarize(build_filter("group_b")),
-    }), 200
+    comparison = db.compare_student_cohorts(
+        build_filter("group_a"),
+        build_filter("group_b"),
+    )
+    return jsonify(comparison), 200
 
 
 @students_bp.route("/students/<student_id>", methods=["GET"])

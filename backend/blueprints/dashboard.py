@@ -10,35 +10,18 @@ dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/api")
 @dashboard_bp.route("/dashboard/summary", methods=["GET"])
 @login_required(roles=["admin", "teacher", "analyst"])
 def dashboard_summary():
-    students = db.list_students(limit=5000)
-    total = len(students)
-    high_risk = sum(1 for s in students if s.get("dropout_risk") == 1)
-    avg_attendance = (
-        round(sum(s.get("attendance_rate", 0) for s in students) / total, 2)
-        if total else 0
-    )
-    avg_score = (
-        round(sum(s.get("avg_test_score", 0) for s in students) / total, 2)
-        if total else 0
-    )
-    return jsonify({
-        "total_students": total,
-        "high_risk_count": high_risk,
-        "safe_count": total - high_risk,
-        "avg_attendance": avg_attendance,
-        "avg_score": avg_score,
-    }), 200
+    return jsonify(db.student_dashboard_summary()), 200
 
 
 @dashboard_bp.route("/analytics/correlations", methods=["GET"])
 @login_required(roles=["admin", "analyst"])
 def correlations():
-    students = db.list_students(limit=5000)
-    return jsonify({"correlations": analytics.compute_correlations(students)}), 200
+    return jsonify({
+        "correlations": db.student_feature_correlations(analytics.NUMERIC_COLS)
+    }), 200
 
 
 @dashboard_bp.route("/analytics/trend", methods=["GET"])
 @login_required(roles=["admin", "analyst"])
 def risk_trend():
-    students = db.list_students(limit=5000)
-    return jsonify({"trend": analytics.compute_risk_trend(students)}), 200
+    return jsonify({"trend": db.student_risk_trend()}), 200
