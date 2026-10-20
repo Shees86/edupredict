@@ -1,0 +1,205 @@
+import unittest
+from unittest.mock import patch
+
+from flask import Flask
+from pymongo.errors import DuplicateKeyError
+
+from blueprints.admin import admin_bp
+from blueprints.students import students_bp
+import db
+
+
+class StudentScopingTests(unittest.TestCase):
+    def setUp(self):
+        app = Flask(__name__)
+        app.secret_key = "test"
+        app.register_blueprint(admin_bp)
+        app.register_blueprint(students_bp)
+        self.client = app.test_client()
+
+    def login_as(self, role, username="staff"):
+        with self.client.session_transaction() as session:
+            session["user"] = {"username": username, "role": role}
+
+    @patch("blueprints.students.db.list_students")
+    @patch("blueprints.students.db.student_scope_for_user")
+    def test_teacher_without_filters_gets_full_assigned_class(self, get_scope, list_students):
+        scope = {"school_id": "school-a", "class_id": "class-7"}
+        records = [{"student_id": "s1"}, {"student_id": "s2"}]
+        get_scope.return_value = scope
+        list_students.return_value = records
+        self.login_as("teacher")
+
+        response = self.client.get("/api/students")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"students": records, "count": 2})
+        list_students.assert_called_once_with(filter_query=scope, limit=None)
+
+    @patch("blueprints.students.db.list_students")
+    @patch("blueprints.students.db.student_scope_for_user")
+    def test_search_is_combined_with_analyst_school_scope(self, get_scope, list_students):
+        get_scope.return_value = {"school_id": "school-a"}
+        list_students.return_value = []
+        self.login_as("analyst")
+
+        response = self.client.get("/api/students?search=Sam")
+
+        self.assertEqual(response.status_code, 200)
+        filter_query = list_students.call_args.kwargs["filter_query"]
+        self.assertEqual(filter_query["$and"][0], {
+            "$or": [
+                {"student_id": {"$regex": "Sam", "$options": "i"}},
+                {"full_name": {"$regex": "Sam", "$options": "i"}},
+            ],
+        })
+        self.assertEqual(filter_query["$and"][1], {"school_id": "school-a"})
+        list_students.assert_called_once_with(filter_query=filter_query, limit=None)
+
+    @patch("blueprints.students.db.list_students")
+    @patch("blueprints.students.db.student_scope_for_user")
+    def test_unassigned_staff_is_denied(self, get_scope, list_students):
+        get_scope.return_value = None
+        self.login_as("teacher")
+
+        response = self.client.get("/api/students")
+
+        self.assertEqual(response.status_code, 403)
+        list_students.assert_not_called()
+
+    @patch("blueprints.students.db.get_student", return_value=None)
+    @patch("blueprints.students.db.student_scope_for_user")
+    def test_individual_student_lookup_uses_staff_scope(self, get_scope, get_student):
+        scope = {"school_id": "school-a", "class_id": "class-7"}
+        get_scope.return_value = scope
+        self.login_as("teacher")
+
+        response = self.client.get("/api/students/s1")
+
+        self.assertEqual(response.status_code, 404)
+        get_student.assert_called_once_with("s1", scope=scope)
+
+    @patch("blueprints.students.db.upsert_student")
+    @patch("blueprints.students.db.student_scope_for_user")
+    def test_teacher_write_cannot_choose_another_scope(self, get_scope, upsert_student):
+        scope = {"school_id": "school-a", "class_id": "class-7"}
+        get_scope.return_value = scope
+        self.login_as("teacher")
+
+        response = self.client.post("/api/students", json={
+            "student_id": "s1",
+            "school_id": "school-b",
+            "class_id": "class-9",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        upsert_student.assert_called_once_with({
+            "student_id": "s1",
+            "school_id": "school-a",
+            "class_id": "class-7",
+        }, scope=scope)
+
+    @patch("blueprints.students.db.upsert_student")
+    @patch("blueprints.students.db.student_scope_for_user")
+    def test_teacher_upload_assigns_scope_to_each_record(self, get_scope, upsert_student):
+        scope = {"school_id": "school-a", "class_id": "class-7"}
+        get_scope.return_value = scope
+        self.login_as("teacher")
+
+        response = self.client.post("/api/data/ingest", json=[{
+            "student_id": "s1",
+            "school_id": "school-b",
+            "class_id": "class-9",
+        }])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["inserted"], 1)
+        upsert_student.assert_called_once_with({
+            "student_id": "s1",
+            "school_id": "school-a",
+            "class_id": "class-7",
+        }, scope=scope)
+
+    @patch("db.students_col.update_one")
+    def test_scoped_upsert_targets_only_assigned_class(self, update_one):
+        record = {
+            "student_id": "s1",
+            "school_id": "school-a",
+            "class_id": "class-7",
+        }
+        scope = {"school_id": "school-a", "class_id": "class-7"}
+
+        db.upsert_student(record, scope=scope)
+
+        update_one.assert_called_once_with(
+            {"student_id": "s1", **scope},
+            {"$set": record},
+            upsert=True,
+        )
+
+    @patch("db.students_col.update_one", side_effect=DuplicateKeyError("duplicate"))
+    def test_scoped_upsert_rejects_existing_student_outside_class(self, update_one):
+        record = {
+            "student_id": "s1",
+            "school_id": "school-a",
+            "class_id": "class-7",
+        }
+
+        with self.assertRaises(PermissionError):
+            db.upsert_student(record, scope={"school_id": "school-a", "class_id": "class-7"})
+
+        update_one.assert_called_once()
+
+    @patch("blueprints.admin.db.log_action")
+    @patch("blueprints.admin.db.approve_user")
+    @patch("blueprints.admin.db.users_col.find_one", return_value={
+        "role": "teacher",
+        "status": "approved",
+    })
+    def test_admin_can_assign_scope_to_existing_unassigned_teacher(
+        self, find_one, approve_user, log_action
+    ):
+        self.login_as("admin")
+
+        response = self.client.post(
+            "/api/admin/approve/teacher-a",
+            json={"school_id": "school-a", "class_id": "class-7"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        approve_user.assert_called_once_with(
+            "teacher-a",
+            school_id="school-a",
+            class_id="class-7",
+        )
+        log_action.assert_called_once_with(
+            "staff",
+            "admin",
+            "assign-staff-scope",
+            target="teacher-a",
+        )
+        find_one.assert_called_once()
+
+    @patch("db.users_col.find")
+    def test_pending_user_list_includes_approved_staff_missing_scope(self, find):
+        find.return_value = [{
+            "_id": "legacy-id",
+            "username": "teacher-a",
+            "role": "teacher",
+            "status": "approved",
+        }]
+
+        users = db.list_pending_users()
+
+        self.assertTrue(users[0]["needs_scope_assignment"])
+        self.assertEqual(users[0]["_id"], "legacy-id")
+        teacher_rule = next(
+            rule for rule in find.call_args.args[0]["$or"]
+            if rule.get("role") == "teacher"
+        )
+        self.assertEqual(teacher_rule["status"], "approved")
+        self.assertIn({"class_id": {"$in": [None, ""]}}, teacher_rule["$or"])
+
+
+if __name__ == "__main__":
+    unittest.main()

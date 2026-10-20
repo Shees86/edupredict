@@ -15,6 +15,10 @@ students_bp = Blueprint("students", __name__, url_prefix="/api")
 def get_students():
     search_query = (request.args.get("search") or request.args.get("query") or "").strip()
     conditions = []
+    user = session["user"]
+    scope = db.student_scope_for_user(user["username"], user["role"])
+    if scope is None:
+        return jsonify({"error": "Your account is not assigned to a school or class"}), 403
 
     if search_query:
         # Escape before using as a Mongo $regex to avoid injection/ReDoS.
@@ -55,6 +59,9 @@ def get_students():
     if risk in ("high", "safe"):
         conditions.append({"dropout_risk": 1 if risk == "high" else 0})
 
+    if scope:
+        conditions.append(scope)
+
     if conditions:
         filter_query = {"$and": conditions} if len(conditions) > 1 else conditions[0]
         students = db.list_students(filter_query=filter_query, limit=None)
@@ -91,7 +98,12 @@ def get_student(student_id):
     user = session["user"]
     if user["role"] == "student" and user["username"] != student_id:
         return jsonify({"error": "Students may only view their own record"}), 403
-    student = db.get_student(student_id)
+    scope = {}
+    if user["role"] in ("teacher", "analyst"):
+        scope = db.student_scope_for_user(user["username"], user["role"])
+        if scope is None:
+            return jsonify({"error": "Your account is not assigned to a school or class"}), 403
+    student = db.get_student(student_id, scope=scope)
     if not student:
         return jsonify({"error": "Not found"}), 404
     return jsonify(student), 200
@@ -100,9 +112,19 @@ def get_student(student_id):
 @students_bp.route("/students", methods=["POST"])
 @login_required(roles=["admin", "teacher"])
 def upsert_student():
+    user = session["user"]
     data = request.get_json(force=True)
+    scope = {}
+    if user["role"] == "teacher":
+        scope = db.student_scope_for_user(user["username"], user["role"])
+        if scope is None:
+            return jsonify({"error": "Your account is not assigned to a school or class"}), 403
+        if isinstance(data, dict):
+            data = {**data, **scope}
     try:
-        db.upsert_student(data)
+        db.upsert_student(data, scope=scope or None)
+    except PermissionError as error:
+        return jsonify({"error": str(error)}), 403
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
     return jsonify({"message": "Saved"}), 200
@@ -113,6 +135,13 @@ def upsert_student():
 def ingest_csv():
     """Batch ingest via CSV (multipart, field 'file') or JSON
     (raw array, {"students": [...]}, or a .json file upload)."""
+    user = session["user"]
+    scope = {}
+    if user["role"] == "teacher":
+        scope = db.student_scope_for_user(user["username"], user["role"])
+        if scope is None:
+            return jsonify({"error": "Your account is not assigned to a school or class"}), 403
+
     numeric_fields = {
         field for field, expected_type in db.STUDENT_FIELDS.items()
         if expected_type is not str
@@ -124,6 +153,9 @@ def ingest_csv():
             if not isinstance(row, dict):
                 errors.append({"row": i, "error": "Student record must be an object"})
                 continue
+            row = dict(row)
+            if scope:
+                row.update(scope)
             if row.get("student_id") in (None, ""):
                 skipped += 1
                 continue
@@ -137,8 +169,10 @@ def ingest_csv():
                                 row[numeric_field] = float(row[numeric_field])
                             except (TypeError, ValueError) as error:
                                 raise ValueError(f"{numeric_field} must be a number") from error
-                db.upsert_student(row)
+                db.upsert_student(row, scope=scope or None)
                 inserted += 1
+            except PermissionError as error:
+                errors.append({"row": i, "error": str(error)})
             except ValueError as error:
                 errors.append({"row": i, "error": str(error)})
         return inserted, skipped, errors
