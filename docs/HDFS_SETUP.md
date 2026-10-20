@@ -1,8 +1,11 @@
 # HDFS Setup (Pseudo-Distributed / Single-Node)
 
-Sets up a single-node Hadoop cluster for local development — enough to
-demonstrate real HDFS storage and Spark distributed processing without
-needing a multi-machine cluster. Tested on Linux / WSL2.
+Sets up a single-node Hadoop cluster for an optional offline demonstration
+of HDFS storage and Spark distributed processing without needing a
+multi-machine cluster. This pipeline is separate from the live EduPredict
+application and model training: its Parquet output is not consumed by
+`ml/train_model.py`, which reads `data/students_sample.csv`. Tested on
+Linux / WSL2.
 
 ## 1. Install Java + Hadoop
 
