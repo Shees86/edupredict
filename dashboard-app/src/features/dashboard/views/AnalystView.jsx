@@ -147,7 +147,11 @@ export function AnalystOverview({ onNavigate }) {
         <AlertsPanel />
       </div>
 
-      <CohortSummary summary={s} onOpen={() => onNavigate?.("cohorts")} />
+      {s ? (
+        <CohortSummary summary={s} onOpen={() => onNavigate?.("cohorts")} />
+      ) : (
+        <LoadingCards />
+      )}
     </div>
   );
 }
