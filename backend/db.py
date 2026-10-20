@@ -180,6 +180,32 @@ def student_dashboard_summary():
             },
             "attendance_sum": {"$sum": {"$ifNull": ["$attendance_rate", 0]}},
             "score_sum": {"$sum": {"$ifNull": ["$avg_test_score", 0]}},
+            "attendance_under_40": {
+                "$sum": {"$cond": [{"$lt": [{"$ifNull": ["$attendance_rate", 0]}, 40]}, 1, 0]}
+            },
+            "attendance_40_60": {
+                "$sum": {"$cond": [
+                    {"$and": [
+                        {"$gte": [{"$ifNull": ["$attendance_rate", 0]}, 40]},
+                        {"$lt": [{"$ifNull": ["$attendance_rate", 0]}, 60]},
+                    ]},
+                    1,
+                    0,
+                ]}
+            },
+            "attendance_60_80": {
+                "$sum": {"$cond": [
+                    {"$and": [
+                        {"$gte": [{"$ifNull": ["$attendance_rate", 0]}, 60]},
+                        {"$lt": [{"$ifNull": ["$attendance_rate", 0]}, 80]},
+                    ]},
+                    1,
+                    0,
+                ]}
+            },
+            "attendance_80_plus": {
+                "$sum": {"$cond": [{"$gte": [{"$ifNull": ["$attendance_rate", 0]}, 80]}, 1, 0]}
+            },
         }},
         {"$project": {
             "_id": 0,
@@ -192,6 +218,10 @@ def student_dashboard_summary():
             "avg_score": {
                 "$round": [{"$divide": ["$score_sum", "$total"]}, 2]
             },
+            "attendance_under_40": 1,
+            "attendance_40_60": 1,
+            "attendance_60_80": 1,
+            "attendance_80_plus": 1,
         }},
     ]
     return next(iter(students_col.aggregate(pipeline)), {
@@ -200,6 +230,10 @@ def student_dashboard_summary():
         "safe_count": 0,
         "avg_attendance": 0,
         "avg_score": 0,
+        "attendance_under_40": 0,
+        "attendance_40_60": 0,
+        "attendance_60_80": 0,
+        "attendance_80_plus": 0,
     })
 
 

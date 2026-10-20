@@ -59,10 +59,9 @@ import {
 
 export function AnalystOverview({ onNavigate }) {
   const summary = useAsync(getSummary);
-  const students = useAsync(() => listStudents());
   const correlations = useAsync(getCorrelations);
 
-  const loading = summary.loading || students.loading || correlations.loading;
+  const loading = summary.loading || correlations.loading;
 
   if (summary.status === "error") {
     return (
@@ -74,7 +73,6 @@ export function AnalystOverview({ onNavigate }) {
   }
 
   const s = summary.data;
-  const rows = students.data || [];
   const correlationRows = Object.entries(correlations.data || {})
     .map(([feature, value]) => ({ feature: prettifyFeature(feature), value }))
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
@@ -149,7 +147,7 @@ export function AnalystOverview({ onNavigate }) {
         <AlertsPanel />
       </div>
 
-      <CohortSummary students={rows} onOpen={() => onNavigate?.("cohorts")} />
+      <CohortSummary summary={s} onOpen={() => onNavigate?.("cohorts")} />
     </div>
   );
 }
@@ -164,24 +162,18 @@ function AnalystHeader() {
   );
 }
 
-function CohortSummary({ students, onOpen }) {
+function CohortSummary({ summary, onOpen }) {
   const buckets = [
-    { bucket: "<40", count: 0, fill: "var(--chart-3)" },
-    { bucket: "40–60", count: 0, fill: "var(--chart-5)" },
-    { bucket: "60–80", count: 0, fill: "var(--chart-1)" },
-    { bucket: "80–100", count: 0, fill: "var(--chart-2)" },
+    { bucket: "<40", count: summary.attendance_under_40, fill: "var(--chart-3)" },
+    { bucket: "40–60", count: summary.attendance_40_60, fill: "var(--chart-5)" },
+    { bucket: "60–80", count: summary.attendance_60_80, fill: "var(--chart-1)" },
+    { bucket: "80–100", count: summary.attendance_80_plus, fill: "var(--chart-2)" },
   ];
-  students.forEach((student) => {
-    const value = Number(student.attendance_rate);
-    if (Number.isNaN(value)) return;
-    const index = value < 40 ? 0 : value < 60 ? 1 : value < 80 ? 2 : 3;
-    buckets[index].count += 1;
-  });
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       <ChartCard title="Attendance bands" description="Students by attendance percentage" actions={<Button variant="ghost" size="sm" onClick={onOpen}>Compare cohorts</Button>}>
-        {students.length > 0 ? (
+        {summary.total_students > 0 ? (
           <ChartFrame height={210}>
             <BarChart data={buckets} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
               <CartesianGrid {...gridProps} />
@@ -205,21 +197,21 @@ function CohortSummary({ students, onOpen }) {
           <SectionHeader title="Risk mix" description="Share of the live cohort by stored flag" actions={<LineIcon className="size-3.5 text-muted-foreground" />} />
         </CardHeader>
         <CardContent className="pt-0">
-          <RiskMix students={students} />
+          <RiskMix safeCount={summary.safe_count} highRiskCount={summary.high_risk_count} />
         </CardContent>
       </Card>
     </div>
   );
 }
 
-function RiskMix({ students }) {
-  if (students.length === 0) {
+function RiskMix({ safeCount, highRiskCount }) {
+  const total = safeCount + highRiskCount;
+  if (total === 0) {
     return <EmptyState title="No students to summarize" className="py-10" />;
   }
-  const high = students.filter((s) => s.dropout_risk === 1).length;
   const data = [
-    { name: "On track", value: students.length - high, fill: "var(--chart-2)" },
-    { name: "High risk", value: high, fill: "var(--chart-3)" },
+    { name: "On track", value: safeCount, fill: "var(--chart-2)" },
+    { name: "High risk", value: highRiskCount, fill: "var(--chart-3)" },
   ];
   return (
     <div className="flex items-center gap-6">
@@ -243,7 +235,7 @@ function RiskMix({ students }) {
             <div className="mt-0.5 font-mono text-[1.125rem] tnum">
               {formatNumber(entry.value)}
               <span className="ml-1 text-[0.75rem] text-muted-foreground">
-                ({formatPercent(entry.value / students.length, 0)})
+                ({formatPercent(entry.value / total, 0)})
               </span>
             </div>
           </div>
