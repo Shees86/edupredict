@@ -29,7 +29,7 @@ def predict():
         return jsonify({"error": f"Missing fields: {missing}"}), 400
     label, probability = ml_predictor.predict_dropout_risk(data)
     db.save_prediction(data["student_id"], label, probability, data)
-    if label == "High Risk":
+    if label == "High Risk" and not db.has_unresolved_alert(data["student_id"]):
         db.create_alert(
             data["student_id"],
             f"Student {data['student_id']} flagged as HIGH DROPOUT RISK "

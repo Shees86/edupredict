@@ -20,6 +20,14 @@ def get_alerts():
     return jsonify({"alerts": alerts, "count": len(alerts)}), 200
 
 
+@alerts_bp.route("/<alert_id>/resolve", methods=["POST"])
+@login_required(roles=["admin", "teacher"])
+def resolve_alert(alert_id):
+    if not db.resolve_alert(alert_id):
+        return jsonify({"error": "Alert not found"}), 404
+    return jsonify({"message": "Marked resolved"}), 200
+
+
 @alerts_bp.route("/stream")
 @login_required(roles=["admin", "teacher", "analyst"])
 def alerts_stream():

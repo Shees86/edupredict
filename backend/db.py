@@ -457,10 +457,26 @@ def create_alert(student_id, message, severity="high"):
     })
 
 
+def has_unresolved_alert(student_id):
+    return alerts_col.find_one({"student_id": student_id, "resolved": False}) is not None
+
+
 def list_alerts(resolved=False, limit=100):
-    return list(
-        alerts_col.find({"resolved": resolved}, {"_id": 0}).limit(limit)
+    alerts = list(alerts_col.find({"resolved": resolved}).limit(limit))
+    for alert in alerts:
+        alert["id"] = str(alert.pop("_id"))
+    return alerts
+
+
+def resolve_alert(alert_id):
+    from bson import ObjectId
+    if not ObjectId.is_valid(alert_id):
+        return False
+    result = alerts_col.update_one(
+        {"_id": ObjectId(alert_id)},
+        {"$set": {"resolved": True}},
     )
+    return result.matched_count > 0
 
 
 def create_feedback(username, role, category, message):
