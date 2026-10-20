@@ -1,6 +1,7 @@
 import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { setAuthenticated } from "@/lib/api";
+import { toast } from "sonner";
+import { apiGet, apiPost, setAuthenticated } from "@/lib/api";
 import { ThemeProvider } from "@/lib/theme";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LandingPage } from "@/features/landing/LandingPage";
@@ -16,6 +17,7 @@ import { DashboardApp } from "@/features/dashboard/DashboardApp";
  */
 export default function App() {
   const [user, setUser] = React.useState(null);
+  const [isSessionLoading, setIsSessionLoading] = React.useState(true);
   const [sessionExpired, setSessionExpired] = React.useState(false);
   const [screen, setScreen] = React.useState(() => {
     if (typeof window !== "undefined") {
@@ -32,21 +34,40 @@ export default function App() {
   }, [user]);
 
   React.useEffect(() => {
+    let active = true;
+    apiGet("/auth/me")
+      .then(({ user: sessionUser }) => {
+        if (active) setUser(sessionUser);
+      })
+      .catch((error) => {
+        if (error.status !== 401) {
+          console.error("Could not restore the session.", error);
+        }
+      })
+      .finally(() => {
+        if (active) setIsSessionLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
     function onSessionExpired() {
       setUser(null);
       setSessionExpired(true);
       setScreen("auth");
       setInitialMode("login");
     }
-    function onSignOut() {
-      // Fire-and-forget: the local session is dropped regardless of
-      // whether the server call succeeds, matching the old behaviour.
-      fetch(`${import.meta.env.VITE_API_BASE || "http://localhost:5000/api"}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      }).catch(() => {});
-      setUser(null);
-      setScreen("landing");
+    async function onSignOut() {
+      try {
+        await apiPost("/auth/logout");
+        setUser(null);
+        setScreen("landing");
+      } catch (error) {
+        toast.error(error.message || "Couldn't sign out. Try again.");
+      }
     }
     window.addEventListener("ep:session-expired", onSessionExpired);
     window.addEventListener("ep:sign-out", onSignOut);
@@ -70,7 +91,7 @@ export default function App() {
     <ThemeProvider>
       <TooltipProvider delayDuration={250}>
         <AnimatePresence mode="wait">
-          {user ? (
+          {isSessionLoading ? null : user ? (
             <motion.div
               key="dashboard"
               initial={{ opacity: 0 }}
