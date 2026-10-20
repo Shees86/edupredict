@@ -2,8 +2,9 @@
 
 A role-based academic analytics platform that predicts student dropout
 risk, recommends academic pathways (field, university, GPA trend), and
-visualizes institutional data — built on Hadoop/HDFS, PySpark, Flask,
-MongoDB, and React.
+visualizes institutional data — built with Flask, MongoDB, and React.
+An optional offline Hadoop/HDFS and PySpark pipeline is included for
+data-processing demonstrations; it is not part of the live application.
 
 ## Project structure
 
@@ -33,7 +34,7 @@ EduPredict/
 │           └── views/          Per-role dashboards (Admin, Teacher, Student, Analyst)
 │
 ├── ml/                          Training scripts (outputs already committed in backend/)
-├── spark/pyspark_pipeline.py    HDFS-based cleaning, feature engineering, anomaly detection
+├── spark/pyspark_pipeline.py    Optional offline HDFS cleaning and analysis pipeline
 ├── data/                        Sample datasets (CSV)
 └── docs/
     ├── DEPLOYMENT.md            MongoDB Atlas + Render + Vercel deployment guide
@@ -47,8 +48,8 @@ EduPredict/
 |---|---|
 | Authentication | Role-based sessions: Admin, Teacher, Student, Analyst; optional TOTP 2FA |
 | Data ingestion | CSV/JSON upload, web forms |
-| Storage | Hadoop HDFS (pseudo-distributed) |
-| Processing | PySpark — cleaning, feature engineering, anomaly detection |
+| Live application storage | MongoDB |
+| Optional offline processing | PySpark on HDFS — cleaning, feature engineering, anomaly detection |
 | ML — dropout risk | Random Forest classifier |
 | ML — field/college predictor | Matric % → recommended field + college tier |
 | ML — university predictor | Intermediate % → suggested program + university tier |
@@ -63,7 +64,7 @@ EduPredict/
 
 ### Prerequisites
 - Python 3.10+, Node.js 18+, MongoDB Community Server
-- Java 11, Hadoop 3.3.6, PySpark (for the HDFS pipeline — optional locally)
+- Java 11, Hadoop 3.3.6, PySpark (only for the optional offline HDFS pipeline)
 
 ### Backend
 ```bash
@@ -79,7 +80,15 @@ npm install
 npm run dev                # http://localhost:5173
 ```
 
-### HDFS / Spark (optional)
+### Optional offline HDFS / Spark pipeline
+
+This is a standalone data-processing demonstration, not a prerequisite or
+part of the live app's data path. It reads the sample CSV from HDFS and
+writes cleaned Parquet output. `ml/train_model.py` does not consume that
+Parquet output: it always trains from `data/students_sample.csv`. The live
+backend loads the resulting model and encoder pickle files from `backend/`
+to score predictions.
+
 See `docs/HDFS_SETUP.md` for the full pseudo-distributed setup. Summary:
 ```bash
 hdfs namenode -format
@@ -119,6 +128,10 @@ python3 generate_university_prediction_data.py && python3 train_university_model
 python3 train_cgpa_model.py
 ```
 Each script writes its `.pkl` / `_metrics.json` output into `backend/`.
+The dropout training script reads `data/students_sample.csv`; the optional
+Spark pipeline's Parquet output is not used for training. The live backend
+scores requests with the saved pickle model and encoders, without running
+Spark or Hadoop.
 
 ## API reference
 

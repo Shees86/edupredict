@@ -99,9 +99,13 @@ exactly like it did locally — because it's the same code, just hosted.
 
 ## Notes on HDFS/PySpark
 
-The Hadoop/HDFS/PySpark pipeline is a one-time, local preprocessing
-step (raw data → HDFS → Spark cleaning → trained model) — it doesn't
-need to run continuously or be part of the live deployment.
+Hadoop/HDFS/PySpark is an optional offline data-processing demonstration,
+not part of the live application or model-training data path. The Spark
+pipeline reads the sample CSV from HDFS and writes cleaned Parquet, but
+`ml/train_model.py` always reads `data/students_sample.csv` and does not
+consume that Parquet output. The live backend scores predictions using
+the saved pickle model and encoders; the deployed app does not run Spark
+or Hadoop.
 
 ## Render free-tier note
 
