@@ -10,6 +10,7 @@ import {
   LogIn,
   LogOut,
   Menu,
+  MessageSquare,
   Moon,
   Settings,
   Shield,
@@ -37,21 +38,27 @@ export const ROLE_NAV = {
   admin: [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "students", label: "Student register", icon: Users },
+    { id: "feedback", label: "Feedback queue", icon: MessageSquare },
+    { id: "trend", label: "Risk trend", icon: LineChart },
+    { id: "messages", label: "Messages", icon: MessageSquare },
     { id: "governance", label: "Governance", icon: Shield },
   ],
   teacher: [
     { id: "roster", label: "Class roster", icon: ClipboardList },
     { id: "predictors", label: "Predictors", icon: Sparkles },
+    { id: "messages", label: "Messages", icon: MessageSquare },
   ],
   student: [
     { id: "overview", label: "My standing", icon: GraduationCap },
     { id: "goal", label: "Goals & badges", icon: Compass },
     { id: "predictors", label: "Pathway tools", icon: LineChart },
+    { id: "messages", label: "Messages", icon: MessageSquare },
   ],
   analyst: [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "model", label: "Model lab", icon: BookOpen },
     { id: "cohorts", label: "Cohorts", icon: Users },
+    { id: "trend", label: "Risk trend", icon: LineChart },
   ],
 };
 

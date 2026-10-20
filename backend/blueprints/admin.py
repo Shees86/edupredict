@@ -67,7 +67,21 @@ def reject_pending_user(username):
 @admin_bp.route("/audit-log", methods=["GET"])
 @login_required(roles=["admin"])
 def get_audit_log():
-    return jsonify({"log": db.list_audit_log()}), 200
+    try:
+        page = int(request.args.get("page", "1"))
+        per_page = int(request.args.get("per_page", "10"))
+    except ValueError:
+        return jsonify({"error": "page and per_page must be integers"}), 400
+    if page < 1 or not 1 <= per_page <= 100:
+        return jsonify({"error": "page must be positive and per_page must be between 1 and 100"}), 400
+
+    count = db.count_audit_log()
+    return jsonify({
+        "log": db.list_audit_log(limit=per_page, offset=(page - 1) * per_page),
+        "count": count,
+        "page": page,
+        "per_page": per_page,
+    }), 200
 
 
 # Numbers tracked in extensions.stats, updated by the request hooks in app.py.

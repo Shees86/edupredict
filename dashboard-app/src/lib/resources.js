@@ -61,9 +61,22 @@ export async function decidePendingUser(username, approve, assignment = {}) {
   );
 }
 
-export async function listAuditLog() {
-  const data = await apiGet("/audit-log");
-  return data.log || [];
+export async function listAuditLog(page = 1, perPage = 10) {
+  return apiGet(`/audit-log?page=${page}&per_page=${perPage}`);
+}
+
+export async function getRiskTrend() {
+  const data = await apiGet("/analytics/trend");
+  return data.trend || [];
+}
+
+export async function listFeedback(status = "open") {
+  const data = await apiGet(`/feedback?status=${encodeURIComponent(status)}`);
+  return data.feedback || [];
+}
+
+export async function resolveFeedback(feedbackId) {
+  return apiPost(`/feedback/${encodeURIComponent(feedbackId)}/resolve`);
 }
 
 export async function getModelMetrics() {
