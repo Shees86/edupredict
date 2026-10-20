@@ -26,14 +26,14 @@ export async function getStudent(studentId) {
 export async function predictRisk(student) {
   return apiPost("/predict", {
     student_id: student.student_id,
-    age: student.age ?? 20,
+    ...(student.age != null && String(student.age).trim() !== "" ? { age: student.age } : {}),
     attendance_rate: student.attendance_rate,
     avg_test_score: student.avg_test_score,
     assignments_submitted_pct: student.assignments_submitted_pct ?? 70,
     study_hours_per_week: student.study_hours_per_week ?? 8,
     previous_semester_gpa: student.previous_semester_gpa,
     lms_login_frequency_per_week: student.lms_login_frequency_per_week ?? 5,
-    gender: student.gender || "Male",
+    ...(student.gender != null && String(student.gender).trim() !== "" ? { gender: student.gender } : {}),
     family_income_level: student.family_income_level || "Medium",
     parental_education: student.parental_education || "Secondary",
     extracurricular: student.extracurricular || "No",
