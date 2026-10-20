@@ -206,15 +206,7 @@ def setup_2fa():
         return jsonify({"error": "Two-factor authentication is already configured."}), 409
 
     secret = twofa.generate_secret()
-    result = db.users_col.update_one(
-        {
-            "username": username,
-            "totp_enabled": {"$ne": True},
-            "totp_secret": {"$in": [None, ""]},
-        },
-        {"$set": {"totp_secret": secret, "totp_enabled": False}},
-    )
-    if not result.matched_count:
+    if not db.set_totp_secret(username, secret):
         return jsonify({"error": "Two-factor authentication is already configured."}), 409
 
     uri = twofa.get_provisioning_uri(secret, username)

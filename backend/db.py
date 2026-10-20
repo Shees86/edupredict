@@ -2,7 +2,9 @@ import math
 import numbers
 import os
 import secrets
+import hashlib
 from datetime import datetime, timedelta
+from cryptography.fernet import Fernet, InvalidToken
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -18,6 +20,41 @@ feedback_col = db["feedback"]
 audit_col = db["audit_log"]
 goals_col = db["goals"]
 messages_col = db["messages"]
+
+_ENCRYPTED_PREFIX = "enc:v1:"
+
+
+def _secret_cipher():
+    key = os.environ.get("APP_ENCRYPTION_KEY")
+    if not key:
+        raise RuntimeError(
+            "APP_ENCRYPTION_KEY must be configured with a persistent Fernet key "
+            "to store or read encrypted authentication secrets"
+        )
+    try:
+        return Fernet(key.encode("ascii"))
+    except (ValueError, UnicodeEncodeError) as error:
+        raise RuntimeError("APP_ENCRYPTION_KEY must be a valid Fernet key") from error
+
+
+def _encrypt_sensitive(value):
+    if value is None:
+        return None
+    encrypted = _secret_cipher().encrypt(value.encode("utf-8")).decode("ascii")
+    return _ENCRYPTED_PREFIX + encrypted
+
+
+def _decrypt_sensitive(value):
+    if value is None:
+        return None
+    if not value.startswith(_ENCRYPTED_PREFIX):
+        return value
+    try:
+        encrypted = value[len(_ENCRYPTED_PREFIX):].encode("ascii")
+        return _secret_cipher().decrypt(encrypted).decode("utf-8")
+    except (InvalidToken, UnicodeEncodeError, UnicodeDecodeError) as error:
+        raise RuntimeError("Unable to decrypt an authentication secret") from error
+
 
 # Roles that require admin approval before they can log in. Students
 # must also be on the institutional roster and prove ownership of that
@@ -68,6 +105,26 @@ def migrate_legacy_defaults():
         {"class_id": {"$exists": False}},
         {"$set": {"class_id": "general"}},
     )
+    _migrate_legacy_auth_secrets()
+
+
+def _migrate_legacy_auth_secrets():
+    projection = {"totp_secret": 1, "reset_token": 1, "reset_token_hash": 1}
+    for user in users_col.find({}, projection):
+        updates = {}
+        totp_secret = user.get("totp_secret")
+        if totp_secret and not totp_secret.startswith(_ENCRYPTED_PREFIX):
+            updates["totp_secret"] = _encrypt_sensitive(totp_secret)
+
+        reset_token = user.get("reset_token")
+        if reset_token and not reset_token.startswith(_ENCRYPTED_PREFIX):
+            updates["reset_token"] = _encrypt_sensitive(reset_token)
+            updates["reset_token_hash"] = hashlib.sha256(
+                reset_token.encode("utf-8")
+            ).hexdigest()
+
+        if updates:
+            users_col.update_one({"_id": user["_id"]}, {"$set": updates})
 
 
 def create_user(username, password, role, full_name="", email=""):
@@ -586,8 +643,19 @@ def resolve_feedback(feedback_id):
 
 # TOTP-based 2FA — shared secret + time-based code, no SMS provider needed.
 def set_totp_secret(username, secret):
-    """Stores a pending (not-yet-confirmed) TOTP secret."""
-    users_col.update_one({"username": username}, {"$set": {"totp_secret": secret, "totp_enabled": False}})
+    """Stores a pending TOTP secret encrypted and only when none is configured."""
+    result = users_col.update_one(
+        {
+            "username": username,
+            "totp_enabled": {"$ne": True},
+            "totp_secret": {"$in": [None, ""]},
+        },
+        {"$set": {
+            "totp_secret": _encrypt_sensitive(secret),
+            "totp_enabled": False,
+        }},
+    )
+    return result.matched_count > 0
 
 
 def confirm_totp(username):
@@ -599,8 +667,16 @@ def disable_totp(username):
 
 
 def get_totp_secret(username):
-    user = users_col.find_one({"username": username})
-    return user.get("totp_secret") if user else None
+    user = users_col.find_one({"username": username}, {"totp_secret": 1})
+    if not user:
+        return None
+    secret = user.get("totp_secret")
+    if secret and not secret.startswith(_ENCRYPTED_PREFIX):
+        users_col.update_one(
+            {"_id": user["_id"], "totp_secret": secret},
+            {"$set": {"totp_secret": _encrypt_sensitive(secret)}},
+        )
+    return _decrypt_sensitive(secret)
 
 
 # Short-lived, single-use password-reset tokens (see emailer.py).
@@ -610,20 +686,49 @@ def create_reset_token(username):
     token = secrets.token_urlsafe(32)
     users_col.update_one(
         {"username": username},
-        {"$set": {"reset_token": token, "reset_token_expires": datetime.utcnow() + timedelta(minutes=30)}},
+        {"$set": {
+            "reset_token": _encrypt_sensitive(token),
+            "reset_token_hash": hashlib.sha256(token.encode("utf-8")).hexdigest(),
+            "reset_token_expires": datetime.utcnow() + timedelta(minutes=30),
+        }},
     )
     return token
 
 
 def reset_password_with_token(token, new_password):
-    user = users_col.find_one({"reset_token": token})
-    if not user or not user.get("reset_token_expires") or user["reset_token_expires"] < datetime.utcnow():
+    if not isinstance(token, str):
         return False
-    users_col.update_one(
-        {"username": user["username"]},
-        {"$set": {"password_hash": generate_password_hash(new_password)}, "$unset": {"reset_token": "", "reset_token_expires": ""}},
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    user = users_col.find_one({
+        "$or": [
+            {"reset_token_hash": token_hash},
+            {"reset_token": token},
+        ],
+    })
+    now = datetime.utcnow()
+    if not user or not user.get("reset_token_expires") or user["reset_token_expires"] < now:
+        return False
+    token_query = (
+        {"reset_token_hash": token_hash}
+        if user.get("reset_token_hash") == token_hash
+        else {"reset_token": token}
     )
-    return True
+    result = users_col.update_one(
+        {
+            "_id": user["_id"],
+            **token_query,
+            "reset_token_expires": {"$gte": now},
+        },
+        {
+            "$set": {"password_hash": generate_password_hash(new_password)},
+            "$unset": {
+                "reset_token": "",
+                "reset_token_hash": "",
+                "reset_token_expires": "",
+            },
+        },
+    )
+    return result.modified_count == 1
 
 
 # Notification preferences — which alert channels a user wants.

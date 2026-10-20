@@ -2,7 +2,8 @@ import os
 import time
 import secrets
 import sys
-from flask import Flask, request, jsonify
+from datetime import timedelta
+from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -20,6 +21,10 @@ from blueprints.feedback import feedback_bp
 from blueprints.engagement import engagement_bp
 
 app = Flask(__name__)
+
+_session_idle_timeout = int(os.environ.get("SESSION_IDLE_TIMEOUT_SECONDS", "1800"))
+if _session_idle_timeout <= 0:
+    raise ValueError("SESSION_IDLE_TIMEOUT_SECONDS must be a positive integer")
 
 # SECURITY: never fall back to a hardcoded secret — anyone who can read
 # this public repo would be able to forge session cookies for any
@@ -41,6 +46,8 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="None",
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,          # JS on the page can't read the session cookie (XSS mitigation)
+    PERMANENT_SESSION_LIFETIME=timedelta(seconds=_session_idle_timeout),
+    SESSION_IDLE_TIMEOUT_SECONDS=_session_idle_timeout,
     MAX_CONTENT_LENGTH=5 * 1024 * 1024,    # 5 MB cap on any request body — blocks oversized upload abuse
 )
 CORS(app, supports_credentials=True, origins=FRONTEND_ORIGINS)  # explicit allow-list — never a wildcard "*"
@@ -57,6 +64,18 @@ if trust_proxy():
 @app.before_request
 def _track_request_start():
     request._start_time = time.time()
+    if "user" in session or "pending_2fa_username" in session:
+        now = time.time()
+        last_activity = session.get("_last_activity")
+        if last_activity is not None and (
+            not isinstance(last_activity, (int, float))
+            or last_activity > now
+            or now - last_activity >= app.config["SESSION_IDLE_TIMEOUT_SECONDS"]
+        ):
+            session.clear()
+            return
+        session["_last_activity"] = now
+        session.permanent = True
 
 
 @app.after_request
@@ -66,6 +85,9 @@ def _track_request_end(response):
     stats["total_duration"] += duration
     if response.status_code >= 500:
         stats["errors"] += 1
+    if "user" in session or "pending_2fa_username" in session:
+        session["_last_activity"] = time.time()
+        session.permanent = True
     return response
 
 
