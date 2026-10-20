@@ -65,6 +65,13 @@ def post_message():
     text = (data.get("text") or "").strip()
     if not recipient or not text:
         return jsonify({"error": "recipient and text are required"}), 400
+    recipient_user = db.users_col.find_one({"username": recipient}, {"_id": 0, "role": 1})
+    if not recipient_user:
+        return jsonify({"error": "Recipient not found"}), 404
+    if user["role"] == "teacher":
+        scope = db.student_scope_for_user(user["username"], user["role"])
+        if not scope or recipient_user.get("role") != "student" or not db.get_student(recipient, scope=scope):
+            return jsonify({"error": "Teachers may only message their own students"}), 403
     db.send_message(user["username"], recipient, user["role"], text[:2000])
     return jsonify({"message": "Sent"}), 201
 
