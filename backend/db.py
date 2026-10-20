@@ -170,6 +170,239 @@ def list_students(filter_query=None, limit=10):
     return list(cursor.limit(limit))
 
 
+def student_dashboard_summary():
+    pipeline = [
+        {"$group": {
+            "_id": None,
+            "total": {"$sum": 1},
+            "high_risk": {
+                "$sum": {"$cond": [{"$eq": ["$dropout_risk", 1]}, 1, 0]}
+            },
+            "attendance_sum": {"$sum": {"$ifNull": ["$attendance_rate", 0]}},
+            "score_sum": {"$sum": {"$ifNull": ["$avg_test_score", 0]}},
+        }},
+        {"$project": {
+            "_id": 0,
+            "total_students": "$total",
+            "high_risk_count": "$high_risk",
+            "safe_count": {"$subtract": ["$total", "$high_risk"]},
+            "avg_attendance": {
+                "$round": [{"$divide": ["$attendance_sum", "$total"]}, 2]
+            },
+            "avg_score": {
+                "$round": [{"$divide": ["$score_sum", "$total"]}, 2]
+            },
+        }},
+    ]
+    return next(iter(students_col.aggregate(pipeline)), {
+        "total_students": 0,
+        "high_risk_count": 0,
+        "safe_count": 0,
+        "avg_attendance": 0,
+        "avg_score": 0,
+    })
+
+
+def student_feature_correlations(feature_fields):
+    group = {"_id": None, "total": {"$sum": 1}}
+    for field in feature_fields:
+        if field == "dropout_risk":
+            continue
+        valid_pair = {
+            "$and": [{"$isNumber": f"${field}"}, {"$isNumber": "$dropout_risk"}]
+        }
+
+        def sum_for(expression):
+            return {"$sum": {"$cond": [valid_pair, expression, 0]}}
+
+        group[f"{field}_count"] = sum_for(1)
+        group[f"{field}_x"] = sum_for(f"${field}")
+        group[f"{field}_y"] = sum_for("$dropout_risk")
+        group[f"{field}_xx"] = sum_for({"$multiply": [f"${field}", f"${field}"]})
+        group[f"{field}_yy"] = sum_for({"$multiply": ["$dropout_risk", "$dropout_risk"]})
+        group[f"{field}_xy"] = sum_for({"$multiply": [f"${field}", "$dropout_risk"]})
+
+    correlations = {}
+    for field in feature_fields:
+        if field == "dropout_risk":
+            continue
+        count = "$" + field + "_count"
+        x = "$" + field + "_x"
+        y = "$" + field + "_y"
+        xx = "$" + field + "_xx"
+        yy = "$" + field + "_yy"
+        xy = "$" + field + "_xy"
+        x_variance = {"$subtract": [
+            {"$multiply": ["$$n", "$$xx"]},
+            {"$multiply": ["$$x", "$$x"]},
+        ]}
+        y_variance = {"$subtract": [
+            {"$multiply": ["$$n", "$$yy"]},
+            {"$multiply": ["$$y", "$$y"]},
+        ]}
+        denominator = {"$sqrt": {"$multiply": ["$$x_variance", "$$y_variance"]}}
+        numerator = {"$subtract": [
+            {"$multiply": ["$$n", "$$xy"]},
+            {"$multiply": ["$$x", "$$y"]},
+        ]}
+        correlations[field] = {
+            "count": count,
+            "value": {
+                "$let": {
+                    "vars": {
+                        "n": count,
+                        "x": x,
+                        "y": y,
+                        "xx": xx,
+                        "yy": yy,
+                        "xy": xy,
+                    },
+                    "in": {
+                        "$let": {
+                            "vars": {
+                                "x_variance": x_variance,
+                                "y_variance": y_variance,
+                            },
+                            "in": {
+                                "$cond": [
+                                    {"$and": [
+                                        {"$gte": ["$$n", 2]},
+                                        {"$gt": [
+                                            {"$multiply": [
+                                                "$$x_variance",
+                                                "$$y_variance",
+                                            ]},
+                                            0,
+                                        ]},
+                                    ]},
+                                    {"$round": [
+                                        {"$divide": [numerator, denominator]},
+                                        4,
+                                    ]},
+                                    None,
+                                ]
+                            },
+                        }
+                    },
+                }
+            },
+        }
+
+    pipeline = [
+        {"$group": group},
+        {"$project": {
+            "_id": 0,
+            "total": 1,
+            "correlations": correlations,
+        }},
+    ]
+    result = next(iter(students_col.aggregate(pipeline)), None)
+    if not result or result["total"] < 2:
+        return {}
+    return {
+        field: stats["value"]
+        for field, stats in result["correlations"].items()
+        if stats["count"] > 0
+    }
+
+
+def student_risk_trend(bucket_size=100):
+    pipeline = [
+        {"$setWindowFields": {
+            "sortBy": {"_id": 1},
+            "output": {"row_number": {"$documentNumber": {}}},
+        }},
+        {"$addFields": {
+            "bucket": {"$floor": {
+                "$divide": [{"$subtract": ["$row_number", 1]}, bucket_size]
+            }}
+        }},
+        {"$group": {
+            "_id": "$bucket",
+            "count": {"$sum": 1},
+            "risk_sum": {
+                "$sum": {"$cond": [{"$isNumber": "$dropout_risk"}, "$dropout_risk", 0]}
+            },
+            "risk_count": {
+                "$sum": {"$cond": [{"$isNumber": "$dropout_risk"}, 1, 0]}
+            },
+        }},
+        {"$sort": {"_id": 1}},
+        {"$project": {
+            "_id": 0,
+            "cohort": {"$concat": [
+                {"$toString": {"$multiply": ["$_id", bucket_size]}},
+                "-",
+                {"$toString": {
+                    "$add": [{"$multiply": ["$_id", bucket_size]}, "$count"]
+                }},
+            ]},
+            "high_risk_rate": {
+                "$cond": [
+                    {"$gt": ["$risk_count", 0]},
+                    {"$round": [{"$divide": ["$risk_sum", "$risk_count"]}, 4]},
+                    None,
+                ]
+            },
+        }},
+    ]
+    return list(students_col.aggregate(pipeline))
+
+
+def compare_student_cohorts(filter_a, filter_b):
+    def summary_pipeline(filter_query):
+        return [
+            {"$match": filter_query},
+            {"$group": {
+                "_id": None,
+                "count": {"$sum": 1},
+                "high_risk": {
+                    "$sum": {"$cond": [{"$eq": ["$dropout_risk", 1]}, 1, 0]}
+                },
+                "attendance_sum": {
+                    "$sum": {"$ifNull": ["$attendance_rate", 0]}
+                },
+                "score_sum": {"$sum": {"$ifNull": ["$avg_test_score", 0]}},
+                "gpa_sum": {
+                    "$sum": {"$ifNull": ["$previous_semester_gpa", 0]}
+                },
+            }},
+            {"$project": {
+                "_id": 0,
+                "count": 1,
+                "avg_attendance": {
+                    "$round": [{"$divide": ["$attendance_sum", "$count"]}, 2]
+                },
+                "avg_score": {
+                    "$round": [{"$divide": ["$score_sum", "$count"]}, 2]
+                },
+                "avg_gpa": {
+                    "$round": [{"$divide": ["$gpa_sum", "$count"]}, 2]
+                },
+                "high_risk_pct": {
+                    "$round": [{
+                        "$multiply": [
+                            {"$divide": ["$high_risk", "$count"]},
+                            100,
+                        ]
+                    }, 1]
+                },
+            }},
+        ]
+
+    result = next(iter(students_col.aggregate([{
+        "$facet": {
+            "group_a": summary_pipeline(filter_a),
+            "group_b": summary_pipeline(filter_b),
+        }
+    }])), {})
+
+    def cohort_value(key):
+        return (result.get(key) or [{"count": 0}])[0]
+
+    return {"group_a": cohort_value("group_a"), "group_b": cohort_value("group_b")}
+
+
 def save_prediction(student_id, risk_label, risk_probability, features_used):
     predictions_col.insert_one({
         "student_id": student_id,
