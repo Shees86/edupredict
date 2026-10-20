@@ -8,6 +8,7 @@ import { AdminGovernance, AdminOverview, AdminRegister } from "@/features/dashbo
 import { TeacherPredictors, TeacherRoster } from "@/features/dashboard/views/TeacherView";
 import { StudentGoals, StudentOverview, StudentPredictors } from "@/features/dashboard/views/StudentView";
 import { AnalystCohorts, AnalystModel, AnalystOverview } from "@/features/dashboard/views/AnalystView";
+import { AdminFeedbackQueue, AnalyticsTrend, InAppMessages } from "@/features/dashboard/views/EngagementView";
 import { ErrorScreen } from "@/features/errors/ErrorScreen";
 
 /**
@@ -64,21 +65,27 @@ export function DashboardApp({ user, onLogout }) {
 function SectionView({ role, section, user, onNavigate }) {
   if (role === "admin") {
     if (section === "students") return <AdminRegister />;
+    if (section === "feedback") return <AdminFeedbackQueue />;
+    if (section === "trend") return <AnalyticsTrend />;
+    if (section === "messages") return <InAppMessages user={user} />;
     if (section === "governance") return <AdminGovernance />;
     return <AdminOverview onNavigate={onNavigate} />;
   }
   if (role === "teacher") {
     if (section === "predictors") return <TeacherPredictors />;
+    if (section === "messages") return <InAppMessages user={user} />;
     return <TeacherRoster />;
   }
   if (role === "student") {
     if (section === "predictors") return <StudentPredictors />;
     if (section === "goal") return <StudentGoals user={user} />;
+    if (section === "messages") return <InAppMessages user={user} />;
     return <StudentOverview user={user} />;
   }
   if (role === "analyst") {
     if (section === "model") return <AnalystModel />;
     if (section === "cohorts") return <AnalystCohorts />;
+    if (section === "trend") return <AnalyticsTrend />;
     return <AnalystOverview onNavigate={onNavigate} />;
   }
   return <ErrorScreen code={403} detail={`Unrecognized role: "${role}"`} onHome={() => window.location.reload()} />;

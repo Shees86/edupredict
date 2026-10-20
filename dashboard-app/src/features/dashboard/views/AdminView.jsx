@@ -544,8 +544,10 @@ function PendingApprovals() {
 }
 
 function AuditLog() {
-  const log = useAsync(listAuditLog);
-  const rows = (log.data || []).slice(0, 12);
+  const [page, setPage] = React.useState(1);
+  const log = useAsync(() => listAuditLog(page), [page]);
+  const rows = log.data?.log || [];
+  const pageCount = Math.ceil((log.data?.count || 0) / (log.data?.per_page || 10));
 
   return (
     <Card>
@@ -556,7 +558,7 @@ function AuditLog() {
           actions={<FileClock className="size-3.5 text-muted-foreground" />}
         />
       </CardHeader>
-      <CardContent className="max-h-[17.1rem] overflow-y-auto pt-0">
+      <CardContent className="pt-0">
         {log.loading ? <LoadingBlock label="Loading audit log…" /> : null}
         {log.status === "error" ? <ErrorState message={log.error} onRetry={log.refresh} /> : null}
         {!log.loading && log.status !== "error" && rows.length === 0 ? (
@@ -582,6 +584,21 @@ function AuditLog() {
               </li>
             ))}
           </ul>
+        ) : null}
+        {log.data?.count > 0 ? (
+          <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-3">
+            <span className="text-[0.6875rem] text-muted-foreground">
+              Page {page} of {pageCount} · {log.data.count} entries
+            </span>
+            <div className="flex gap-1">
+              <Button variant="outline" size="sm" disabled={page <= 1 || log.loading} onClick={() => setPage((value) => value - 1)}>
+                Previous
+              </Button>
+              <Button variant="outline" size="sm" disabled={page >= pageCount || log.loading} onClick={() => setPage((value) => value + 1)}>
+                Next
+              </Button>
+            </div>
+          </div>
         ) : null}
       </CardContent>
     </Card>

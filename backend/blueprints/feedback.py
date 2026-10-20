@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, session
+from bson import ObjectId
 import db
 from extensions import login_required
 
@@ -29,5 +30,8 @@ def list_feedback():
 @feedback_bp.route("/<feedback_id>/resolve", methods=["POST"])
 @login_required(roles=["admin"])
 def resolve_feedback_route(feedback_id):
-    db.resolve_feedback(feedback_id)
+    if not ObjectId.is_valid(feedback_id):
+        return jsonify({"error": "Invalid feedback id"}), 400
+    if not db.resolve_feedback(feedback_id):
+        return jsonify({"error": "Feedback not found"}), 404
     return jsonify({"message": "Marked resolved"}), 200

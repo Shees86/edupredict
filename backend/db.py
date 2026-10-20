@@ -636,9 +636,10 @@ def list_feedback(status=None, limit=100):
 
 def resolve_feedback(feedback_id):
     from bson import ObjectId
-    feedback_col.update_one(
+    result = feedback_col.update_one(
         {"_id": ObjectId(feedback_id)}, {"$set": {"status": "resolved"}}
     )
+    return result.matched_count > 0
 
 
 # TOTP-based 2FA — shared secret + time-based code, no SMS provider needed.
@@ -771,9 +772,18 @@ def log_action(actor_username, actor_role, action, target="", details=""):
     })
 
 
-def list_audit_log(limit=10):
-    items = list(audit_col.find({}, {"_id": 0}).sort("created_at", -1).limit(limit))
+def list_audit_log(limit=10, offset=0):
+    items = list(
+        audit_col.find({}, {"_id": 0})
+        .sort("created_at", -1)
+        .skip(offset)
+        .limit(limit)
+    )
     return items
+
+
+def count_audit_log():
+    return audit_col.count_documents({})
 
 
 # Self-set student progress goals (e.g. attendance/GPA target).
