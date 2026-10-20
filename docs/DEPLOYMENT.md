@@ -11,8 +11,12 @@ any browser, with no local Hadoop/MongoDB/Python setup required.
 2. Create a free "M0" cluster (any region close to you).
 3. Under **Database Access**: create a user, e.g. username `edupredict`,
    generate a password — **save it**, you'll need it.
-4. Under **Network Access**: click "Add IP Address" → **Allow Access
-   from Anywhere** (0.0.0.0/0) — needed since Render's IP isn't fixed.
+4. Under **Network Access**, allow only the specific IP addresses or
+   ranges that need database access: your current public IP for local
+   administration and the outbound IP addresses/ranges provided for
+   your Render service. If Render does not provide stable outbound IPs
+   for your plan, use a supported private-network or static-egress
+   option. Do not allow access from anywhere (0.0.0.0/0).
 5. Click **Connect** → **Drivers** → copy the connection string. It
    looks like:
    ```
@@ -48,22 +52,19 @@ any browser, with no local Hadoop/MongoDB/Python setup required.
    | Key | Value |
    |---|---|
    | `MONGO_URI` | (the connection string from Step 1) |
-   | `FLASK_SECRET_KEY` | any random string, e.g. `edupredict-prod-2026-secure` |
+   | `FLASK_SECRET_KEY` | a unique, cryptographically strong generated secret (for example, generate one with `python -c "import secrets; print(secrets.token_urlsafe(48))"`); do not use a guessable or reused value |
    | `FRONTEND_ORIGIN` | (leave blank for now, fill in after Step 4) |
    | `ADMIN_SETUP_KEY` | any random string — this is required to create the first Admin account, see "Creating accounts" in the main README |
 5. Click **Create Web Service**. Wait for it to build and deploy.
 6. Once live, copy the URL Render gives you, e.g.
    `https://edupredict-backend.onrender.com` — **save this.**
 
-## Step 4: Seed the cloud database
+## Step 4: Initialize the cloud database
 
-On your laptop, temporarily point the seed script at Atlas:
-```bash
-cd backend
-export MONGO_URI="mongodb+srv://edupredict:<password>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority"
-python seed_db.py
-```
-This loads your demo users + 2000 student records into the cloud database.
+The database starts empty; there is no seed script or built-in demo data.
+Create the first admin account by following the **Creating accounts**
+instructions in the main README, using the `ADMIN_SETUP_KEY` configured
+in Step 3.
 
 ## Step 5: Deploy the frontend to Vercel
 
