@@ -1,3 +1,5 @@
+import math
+import numbers
 import os
 import secrets
 from datetime import datetime, timedelta
@@ -20,6 +22,26 @@ messages_col = db["messages"]
 # must also be on the institutional roster and prove ownership of that
 # Student ID (matching roster email) — see /api/auth/register.
 ROLES_REQUIRING_APPROVAL = {"teacher", "analyst", "student"}
+
+STUDENT_FIELDS = {
+    "student_id": str,
+    "full_name": str,
+    "age": numbers.Real,
+    "gender": str,
+    "attendance_rate": numbers.Real,
+    "avg_test_score": numbers.Real,
+    "assignments_submitted_pct": numbers.Real,
+    "family_income_level": str,
+    "parental_education": str,
+    "study_hours_per_week": numbers.Real,
+    "extracurricular": str,
+    "previous_semester_gpa": numbers.Real,
+    "lms_login_frequency_per_week": numbers.Real,
+    "dropout_risk": numbers.Real,
+    "email": str,
+    "student_email": str,
+    "contact_email": str,
+}
 
 
 def init_indexes():
@@ -88,8 +110,34 @@ def reject_user(username):
 
 
 def upsert_student(student_doc):
+    if not isinstance(student_doc, dict):
+        raise ValueError("Student record must be an object")
+
+    unknown_fields = set(student_doc) - STUDENT_FIELDS.keys()
+    if unknown_fields:
+        fields = ", ".join(sorted(unknown_fields, key=str))
+        raise ValueError(f"Unsupported student field(s): {fields}")
+
+    student_id = student_doc.get("student_id")
+    if not isinstance(student_id, str) or not student_id.strip():
+        raise ValueError("student_id must be a non-empty string")
+
+    for field, value in student_doc.items():
+        if value is None:
+            continue
+        expected_type = STUDENT_FIELDS[field]
+        if expected_type is numbers.Real:
+            try:
+                is_finite = math.isfinite(value)
+            except (OverflowError, TypeError):
+                is_finite = False
+            if isinstance(value, bool) or not isinstance(value, numbers.Real) or not is_finite:
+                raise ValueError(f"{field} must be a finite number")
+        elif not isinstance(value, expected_type):
+            raise ValueError(f"{field} must be a string")
+
     students_col.update_one(
-        {"student_id": student_doc["student_id"]},
+        {"student_id": student_id},
         {"$set": student_doc},
         upsert=True,
     )
