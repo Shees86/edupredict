@@ -137,7 +137,9 @@ def handle_503(e):
     return jsonify({"error": "Service temporarily unavailable.", "status": 503}), 503
 
 
+db.init_indexes()
+
+
 if __name__ == "__main__":
-    db.init_indexes()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=os.environ.get("FLASK_DEBUG", "false").lower() == "true")
