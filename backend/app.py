@@ -138,6 +138,7 @@ def handle_503(e):
 
 
 db.init_indexes()
+db.migrate_legacy_defaults()
 
 
 if __name__ == "__main__":

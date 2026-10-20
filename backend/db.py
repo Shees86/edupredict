@@ -55,6 +55,21 @@ def init_indexes():
     messages_col.create_index([("participants", 1), ("created_at", 1)])
 
 
+def migrate_legacy_defaults():
+    users_col.update_many(
+        {"status": {"$exists": False}},
+        {"$set": {"status": "approved"}},
+    )
+    students_col.update_many(
+        {"school_id": {"$exists": False}},
+        {"$set": {"school_id": "main-campus"}},
+    )
+    students_col.update_many(
+        {"class_id": {"$exists": False}},
+        {"$set": {"class_id": "general"}},
+    )
+
+
 def create_user(username, password, role, full_name="", email=""):
     if users_col.find_one({"username": username}):
         return None, "Username already exists"
