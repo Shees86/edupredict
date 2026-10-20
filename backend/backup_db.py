@@ -20,6 +20,17 @@ COLLECTIONS = {
     "predictions": db.predictions_col,
     "alerts": db.alerts_col,
     "feedback": db.feedback_col,
+    "goals": db.goals_col,
+    "messages": db.messages_col,
+    "audit_log": db.audit_col,
+}
+
+USER_BACKUP_PROJECTION = {
+    "password_hash": 0,
+    "totp_secret": 0,
+    "reset_token": 0,
+    "reset_token_hash": 0,
+    "reset_token_expires": 0,
 }
 
 
@@ -35,7 +46,8 @@ def main():
     os.makedirs(backup_dir, exist_ok=True)
 
     for name, collection in COLLECTIONS.items():
-        docs = list(collection.find({}))
+        projection = USER_BACKUP_PROJECTION if name == "users" else None
+        docs = list(collection.find({}, projection) if projection else collection.find({}))
         for d in docs:
             d["_id"] = str(d["_id"])
         out_path = os.path.join(backup_dir, f"{name}.json")

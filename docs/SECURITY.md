@@ -9,7 +9,8 @@ reviewing or extending it.
   in plaintext).
 - Sessions are cookie-based (`HttpOnly`, `Secure`, `SameSite=None` to
   support the cross-origin frontend/backend split between Vercel and
-  Render).
+  Render), with a 30-minute idle timeout by default. Configure
+  `SESSION_IDLE_TIMEOUT_SECONDS` to change the timeout.
 - Admin accounts cannot be created through public self-registration —
   only through a separate endpoint gated behind an `ADMIN_SETUP_KEY`
   environment variable, so no client-side path exists for a user to
@@ -27,6 +28,12 @@ reviewing or extending it.
   before the account can log in.
 - Optional TOTP-based two-factor authentication (`pyotp`), compatible
   with Google Authenticator / Authy.
+- TOTP secrets and password-reset tokens are encrypted in MongoDB with
+  Fernet using `APP_ENCRYPTION_KEY`. Set this to a persistent Fernet key
+  (generate one with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`)
+  and store it in the deployment's secret manager; losing or rotating the
+  key without re-encrypting stored values makes them unreadable. Existing
+  plaintext values are encrypted during application startup.
 
 ## Data access
 
@@ -54,8 +61,8 @@ reviewing or extending it.
 - No API keys or credentials are shipped to the client; the frontend
   only receives a public API base URL.
 - All secrets (Mongo connection string, Flask secret key, SMTP
-  credentials, admin setup key) are read from environment variables,
-  never committed.
+  credentials, admin setup key, and encryption key) are read from
+  environment variables, never committed.
 
 ## Known limitations
 
