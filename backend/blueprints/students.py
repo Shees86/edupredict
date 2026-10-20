@@ -115,9 +115,10 @@ def get_student(student_id):
 @login_required(roles=["admin", "teacher"])
 def upsert_student():
     data = request.get_json(force=True)
-    if "student_id" not in data:
-        return jsonify({"error": "student_id required"}), 400
-    db.upsert_student(data)
+    try:
+        db.upsert_student(data)
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
     return jsonify({"message": "Saved"}), 200
 
 
@@ -126,34 +127,52 @@ def upsert_student():
 def ingest_csv():
     """Batch ingest via CSV (multipart, field 'file') or JSON
     (raw array, {"students": [...]}, or a .json file upload)."""
-    NUMERIC_FIELDS = [
-        "age", "attendance_rate", "avg_test_score",
-        "assignments_submitted_pct", "study_hours_per_week",
-        "previous_semester_gpa", "lms_login_frequency_per_week",
-        "dropout_risk",
-    ]
+    numeric_fields = {
+        field for field, expected_type in db.STUDENT_FIELDS.items()
+        if expected_type is not str
+    }
 
-    def ingest_rows(rows):
+    def ingest_rows(rows, csv_input=False):
         inserted, skipped, errors = 0, 0, []
         for i, row in enumerate(rows):
-            if not row.get("student_id"):
+            if not isinstance(row, dict):
+                errors.append({"row": i, "error": "Student record must be an object"})
+                continue
+            if row.get("student_id") in (None, ""):
                 skipped += 1
                 continue
             try:
-                for numeric_field in NUMERIC_FIELDS:
-                    if row.get(numeric_field) not in (None, ""):
-                        row[numeric_field] = float(row[numeric_field])
+                if csv_input:
+                    for numeric_field in numeric_fields:
+                        if row.get(numeric_field) == "":
+                            row.pop(numeric_field)
+                        elif row.get(numeric_field) is not None:
+                            try:
+                                row[numeric_field] = float(row[numeric_field])
+                            except (TypeError, ValueError) as error:
+                                raise ValueError(f"{numeric_field} must be a number") from error
                 db.upsert_student(row)
                 inserted += 1
-            except Exception as e:
-                errors.append({"row": i, "error": "Invalid or missing value in one of the numeric columns"})
+            except ValueError as error:
+                errors.append({"row": i, "error": str(error)})
         return inserted, skipped, errors
+
+    def rows_from_payload(payload):
+        if isinstance(payload, list):
+            rows = payload
+        elif isinstance(payload, dict):
+            rows = payload.get("students")
+        else:
+            rows = None
+        if not isinstance(rows, list) or not rows:
+            return None
+        return rows
 
     # JSON body (no file) — e.g. { "students": [ {...}, {...} ] }
     if request.is_json:
         payload = request.get_json(force=True)
-        rows = payload.get("students", payload if isinstance(payload, list) else [])
-        if not rows:
+        rows = rows_from_payload(payload)
+        if rows is None:
             return jsonify({"error": "Expected a JSON array or {\"students\": [...]}"}), 400
         inserted, skipped, errors = ingest_rows(rows)
         return jsonify({"message": "Ingestion complete", "format": "json", "inserted": inserted, "skipped": skipped, "errors": errors[:10]}), 200
@@ -169,14 +188,20 @@ def ingest_csv():
             payload = json.loads(file.stream.read().decode("utf-8"))
         except Exception:
             return jsonify({"error": "Invalid JSON file"}), 400
-        rows = payload.get("students", payload if isinstance(payload, list) else [])
+        rows = rows_from_payload(payload)
+        if rows is None:
+            return jsonify({"error": "Expected a JSON array or {\"students\": [...]}"}), 400
         inserted, skipped, errors = ingest_rows(rows)
         return jsonify({"message": "Ingestion complete", "format": "json", "inserted": inserted, "skipped": skipped, "errors": errors[:10]}), 200
 
     if filename.endswith(".csv"):
         stream = io.StringIO(file.stream.read().decode("utf-8"))
         reader = csv.DictReader(stream)
-        inserted, skipped, errors = ingest_rows(list(reader))
+        unknown_headers = set(reader.fieldnames or []) - db.STUDENT_FIELDS.keys()
+        if unknown_headers:
+            fields = ", ".join(sorted(unknown_headers, key=str))
+            return jsonify({"error": f"Unsupported student field(s): {fields}"}), 400
+        inserted, skipped, errors = ingest_rows(list(reader), csv_input=True)
         return jsonify({"message": "Ingestion complete", "format": "csv", "inserted": inserted, "skipped": skipped, "errors": errors[:10]}), 200
 
     return jsonify({"error": "Only .csv or .json files are supported"}), 400
