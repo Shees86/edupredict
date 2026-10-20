@@ -197,8 +197,26 @@ def reset_password():
 @login_required()
 def setup_2fa():
     username = session["user"]["username"]
+    user = db.users_col.find_one(
+        {"username": username}, {"totp_secret": 1, "totp_enabled": 1}
+    )
+    if not user:
+        return jsonify({"error": "Account not found."}), 404
+    if user.get("totp_enabled") or user.get("totp_secret"):
+        return jsonify({"error": "Two-factor authentication is already configured."}), 409
+
     secret = twofa.generate_secret()
-    db.set_totp_secret(username, secret)
+    result = db.users_col.update_one(
+        {
+            "username": username,
+            "totp_enabled": {"$ne": True},
+            "totp_secret": {"$in": [None, ""]},
+        },
+        {"$set": {"totp_secret": secret, "totp_enabled": False}},
+    )
+    if not result.matched_count:
+        return jsonify({"error": "Two-factor authentication is already configured."}), 409
+
     uri = twofa.get_provisioning_uri(secret, username)
     return jsonify({"secret": secret, "provisioning_uri": uri}), 200
 
@@ -221,6 +239,16 @@ def confirm_2fa():
 @login_required()
 def disable_2fa_route():
     username = session["user"]["username"]
+    data = request.get_json(force=True)
+    password = data.get("password", "")
+    code = data.get("code", "")
+    authenticated = bool(password) and bool(db.verify_user(username, password))
+    if not authenticated and code:
+        secret = db.get_totp_secret(username)
+        authenticated = twofa.verify_code(secret, code)
+    if not authenticated:
+        return jsonify({"error": "Invalid password or two-factor authentication code."}), 401
+
     db.disable_totp(username)
     session["user"]["totp_enabled"] = False
     db.log_action(username, session["user"]["role"], "disable-2fa")
