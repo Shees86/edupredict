@@ -9,6 +9,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from pymongo import MongoClient, UpdateOne
 from pymongo.errors import BulkWriteError, DuplicateKeyError
 from werkzeug.security import generate_password_hash, check_password_hash
+from password_policy import validate_password
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017/")
 DB_NAME = os.environ.get("MONGO_DB_NAME", "edupredict")
 client = MongoClient(MONGO_URI)
@@ -129,6 +130,9 @@ def _migrate_legacy_auth_secrets():
 
 
 def create_user(username, password, role, full_name="", email=""):
+    password_error = validate_password(password)
+    if password_error:
+        return None, password_error
     if users_col.find_one({"username": username}):
         return None, "Username already exists"
     status = "pending" if role in ROLES_REQUIRING_APPROVAL else "approved"
@@ -768,7 +772,7 @@ def create_reset_token(username):
 
 
 def reset_password_with_token(token, new_password):
-    if not isinstance(token, str):
+    if not isinstance(token, str) or validate_password(new_password):
         return False
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
     user = users_col.find_one({
@@ -809,6 +813,16 @@ def reset_password_with_token(token, new_password):
         },
     )
     return result.modified_count == 1
+
+
+def set_user_password(username, new_password):
+    if validate_password(new_password):
+        return False
+    result = users_col.update_one(
+        {"username": username},
+        {"$set": {"password_hash": generate_password_hash(new_password)}},
+    )
+    return result.matched_count == 1
 
 
 # Notification preferences — which alert channels a user wants.
