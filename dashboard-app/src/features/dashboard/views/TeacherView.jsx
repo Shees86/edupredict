@@ -45,6 +45,7 @@ import {
 export function TeacherRoster() {
   const [search, setSearch] = React.useState("");
   const [debounced, setDebounced] = React.useState("");
+  const [page, setPage] = React.useState(1);
   const [selected, setSelected] = React.useState(null);
   const [predicting, setPredicting] = React.useState(null);
   const [result, setResult] = React.useState(null);
@@ -59,6 +60,10 @@ export function TeacherRoster() {
 
   const students = useAsync(() => listStudents(debounced), [debounced]);
   const rows = students.data || [];
+  const pageSize = 25;
+  const pageCount = Math.ceil(rows.length / pageSize);
+  const currentPage = Math.min(page, Math.max(pageCount, 1));
+  const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   function selectStudentForPrediction(student) {
     setSelected(student);
@@ -120,7 +125,14 @@ export function TeacherRoster() {
         <Card className="overflow-hidden">
           <CardHeader className="gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
             <SectionHeader title="Students" />
-            <SearchField value={search} onChange={setSearch} placeholder="Search ID or name…" />
+            <SearchField
+              value={search}
+              onChange={(value) => {
+                setSearch(value);
+                setPage(1);
+              }}
+              placeholder="Search ID or name…"
+            />
           </CardHeader>
           <CardContent className="p-0">
             {students.status === "error" ? (
@@ -154,7 +166,7 @@ export function TeacherRoster() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((student) => {
+                  {pageRows.map((student) => {
                     const isSelected = selected?.student_id === student.student_id;
                     return (
                       <TableRow
@@ -198,6 +210,31 @@ export function TeacherRoster() {
                 </TableBody>
               </Table>
             )}
+            {!students.loading && students.status !== "error" && rows.length > 0 ? (
+              <div className="flex items-center justify-between border-t border-border/50 p-3">
+                <span className="text-[0.6875rem] text-muted-foreground">
+                  Page {currentPage} of {pageCount} · {rows.length} students
+                </span>
+                <div className="flex gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage <= 1}
+                    onClick={() => setPage(currentPage - 1)}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage >= pageCount}
+                    onClick={() => setPage(currentPage + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
