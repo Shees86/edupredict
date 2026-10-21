@@ -6,6 +6,7 @@ import emailer
 import twofa
 from extensions import login_required, rate_limit
 from config import FRONTEND_ORIGIN
+from password_policy import validate_password
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -26,8 +27,9 @@ def register():
         return jsonify({"error": "Invalid role"}), 400
     if not username or not password:
         return jsonify({"error": "username and password required"}), 400
-    if len(password) < 6:
-        return jsonify({"error": "Password must be at least 6 characters"}), 400
+    password_error = validate_password(password)
+    if password_error:
+        return jsonify({"error": password_error}), 400
 
     if role == "student":
         # Ownership is: (1) Student ID is on the roster, (2) signup email
@@ -88,8 +90,9 @@ def register_admin():
     email = data.get("email", "").strip()
     if not username or not password:
         return jsonify({"error": "username and password required"}), 400
-    if len(password) < 6:
-        return jsonify({"error": "Password must be at least 6 characters"}), 400
+    password_error = validate_password(password)
+    if password_error:
+        return jsonify({"error": password_error}), 400
 
     user_id, err = db.create_user(username, password, "admin", full_name, email)
     if err:
@@ -193,12 +196,32 @@ def reset_password():
     data = request.get_json(force=True)
     token = data.get("token", "")
     new_password = data.get("new_password", "")
-    if len(new_password) < 6:
-        return jsonify({"error": "Password must be at least 6 characters"}), 400
+    password_error = validate_password(new_password)
+    if password_error:
+        return jsonify({"error": password_error}), 400
     ok = db.reset_password_with_token(token, new_password)
     if not ok:
         return jsonify({"error": "This reset link is invalid or has expired."}), 400
     return jsonify({"message": "Password updated — you can now sign in."}), 200
+
+
+@auth_bp.route("/change-password", methods=["POST"])
+@rate_limit(max_attempts=8, window_seconds=60)
+@login_required()
+def change_password():
+    data = request.get_json(force=True)
+    current_password = data.get("current_password", "")
+    new_password = data.get("new_password", "")
+    password_error = validate_password(new_password)
+    if password_error:
+        return jsonify({"error": password_error}), 400
+
+    username = session["user"]["username"]
+    if not current_password or not db.verify_user(username, current_password):
+        return jsonify({"error": "Current password is incorrect."}), 401
+    if not db.set_user_password(username, new_password):
+        return jsonify({"error": "Account not found."}), 404
+    return jsonify({"message": "Password updated."}), 200
 
 
 @auth_bp.route("/2fa/setup", methods=["POST"])

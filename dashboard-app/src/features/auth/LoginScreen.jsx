@@ -378,9 +378,13 @@ export function AuthScreen({ initialMode = "login", onAuthenticated, onBack, ses
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 6 characters"
+                placeholder="At least 10 characters"
                 autoComplete="new-password"
+                aria-describedby="password-policy-hint"
               />
+              <p id="password-policy-hint" className="text-[0.6875rem] leading-relaxed text-muted-foreground">
+                At least 10 characters, including at least one letter and one digit.
+              </p>
             </div>
 
             <FormMessage error={error} notice={notice} />
@@ -449,14 +453,18 @@ export function AuthScreen({ initialMode = "login", onAuthenticated, onBack, ses
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 6 characters"
+                placeholder="At least 10 characters"
                 autoComplete="new-password"
+                aria-describedby="password-policy-hint"
               />
+              <p id="password-policy-hint" className="text-[0.6875rem] leading-relaxed text-muted-foreground">
+                At least 10 characters, including at least one letter and one digit.
+              </p>
             </div>
 
             <FormMessage error={error} notice={notice} />
 
-            <Button type="submit" className="w-full" disabled={submitting || !resetToken || password.length < 6}>
+            <Button type="submit" className="w-full" disabled={submitting || !resetToken || password.length < 10}>
               {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
               Set new password
             </Button>

@@ -88,7 +88,7 @@ class SensitiveStorageTests(unittest.TestCase):
         }
         update_one.return_value.modified_count = 1
 
-        result = db.reset_password_with_token(token, "new-password")
+        result = db.reset_password_with_token(token, "new-password1")
 
         self.assertTrue(result)
         self.assertEqual(find_one.call_args.args[0]["$or"][0], {
