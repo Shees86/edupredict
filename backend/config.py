@@ -1,7 +1,7 @@
 import os
 
 # Comma-separated list of allowed frontend origins, e.g.
-#   FRONTEND_ORIGIN="https://edupredict-woad.vercel.app,https://edupredict-git-main-edu-predict-team.vercel.app"
+#   FRONTEND_ORIGIN="https://edupredict-blue.vercel.app,https://edupredict-git-main-edu-predict-team.vercel.app"
 # Vercel issues more than one valid URL for the same project (a
 # production alias, a git-branch alias, preview URLs, etc.), so a
 # single hardcoded origin breaks the moment any of those change.
