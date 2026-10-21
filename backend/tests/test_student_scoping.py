@@ -80,6 +80,40 @@ class StudentScopingTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         get_student.assert_called_once_with("s1", scope=scope)
 
+    @patch("blueprints.students.db.delete_student", return_value=True)
+    @patch("blueprints.students.db.student_scope_for_user")
+    def test_teacher_delete_uses_assigned_scope(self, get_scope, delete_student):
+        scope = {"school_id": "school-a", "class_id": "class-7"}
+        get_scope.return_value = scope
+        self.login_as("teacher")
+
+        response = self.client.delete("/api/students/s1")
+
+        self.assertEqual(response.status_code, 200)
+        delete_student.assert_called_once_with("s1", scope=scope)
+
+    @patch("blueprints.students.db.delete_student", side_effect=PermissionError("outside scope"))
+    @patch("blueprints.students.db.student_scope_for_user")
+    def test_teacher_cannot_delete_student_outside_assigned_scope(
+        self, get_scope, delete_student
+    ):
+        get_scope.return_value = {"school_id": "school-a", "class_id": "class-7"}
+        self.login_as("teacher")
+
+        response = self.client.delete("/api/students/s1")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.get_json(), {"error": "outside scope"})
+
+    @patch("blueprints.students.db.delete_student", return_value=False)
+    def test_delete_missing_student_returns_not_found(self, delete_student):
+        self.login_as("admin")
+
+        response = self.client.delete("/api/students/s1")
+
+        self.assertEqual(response.status_code, 404)
+        delete_student.assert_called_once_with("s1", scope=None)
+
     @patch("blueprints.students.db.upsert_student")
     @patch("blueprints.students.db.student_scope_for_user")
     def test_teacher_write_cannot_choose_another_scope(self, get_scope, upsert_student):
@@ -192,6 +226,42 @@ class StudentScopingTests(unittest.TestCase):
             db.upsert_student(record, scope={"school_id": "school-a", "class_id": "class-7"})
 
         update_one.assert_called_once()
+
+    @patch("db.students_col.find_one", return_value=None)
+    @patch("db.students_col.delete_one")
+    def test_scoped_delete_targets_assigned_class(self, delete_one, find_one):
+        delete_one.return_value.deleted_count = 1
+        scope = {"school_id": "school-a", "class_id": "class-7"}
+
+        deleted = db.delete_student("s1", scope=scope)
+
+        self.assertTrue(deleted)
+        delete_one.assert_called_once_with({"student_id": "s1", **scope})
+        find_one.assert_not_called()
+
+    @patch("db.students_col.find_one", return_value={"student_id": "s1"})
+    @patch("db.students_col.delete_one")
+    def test_scoped_delete_rejects_student_outside_class(self, delete_one, find_one):
+        delete_one.return_value.deleted_count = 0
+
+        with self.assertRaises(PermissionError):
+            db.delete_student(
+                "s1",
+                scope={"school_id": "school-a", "class_id": "class-7"},
+            )
+
+        find_one.assert_called_once_with({"student_id": "s1"}, {"_id": 1})
+
+    @patch("db.students_col.find_one", return_value=None)
+    @patch("db.students_col.delete_one")
+    def test_scoped_delete_returns_false_for_missing_student(self, delete_one, find_one):
+        delete_one.return_value.deleted_count = 0
+
+        self.assertFalse(db.delete_student(
+            "s1",
+            scope={"school_id": "school-a", "class_id": "class-7"},
+        ))
+        find_one.assert_called_once()
 
     @patch("blueprints.admin.db.log_action")
     @patch("blueprints.admin.db.approve_user")

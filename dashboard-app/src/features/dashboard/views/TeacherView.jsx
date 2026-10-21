@@ -4,8 +4,10 @@ import {
   ClipboardList,
   GraduationCap,
   Loader2,
+  Pencil,
   Sparkles,
   Target,
+  Trash2,
 } from "lucide-react";
 import {
   CartesianGrid,
@@ -16,7 +18,7 @@ import {
   YAxis,
 } from "recharts";
 import { toast } from "sonner";
-import { listStudents, predictRisk } from "@/lib/resources";
+import { deleteStudent, listStudents, predictRisk, saveStudent } from "@/lib/resources";
 import { useAsync } from "@/lib/use-async";
 import { formatNumber } from "@/lib/format";
 import { PageHeader, SectionHeader } from "@/components/page-header";
@@ -34,6 +36,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -41,6 +51,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+const STUDENT_EDIT_FIELDS = [
+  { name: "full_name", label: "Full name" },
+  { name: "age", label: "Age", numeric: true },
+  { name: "gender", label: "Gender" },
+  { name: "attendance_rate", label: "Attendance rate", numeric: true },
+  { name: "avg_test_score", label: "Average test score", numeric: true },
+  { name: "assignments_submitted_pct", label: "Assignments submitted (%)", numeric: true },
+  { name: "family_income_level", label: "Family income level" },
+  { name: "parental_education", label: "Parental education" },
+  { name: "study_hours_per_week", label: "Study hours per week", numeric: true },
+  { name: "extracurricular", label: "Extracurricular" },
+  { name: "previous_semester_gpa", label: "Previous semester GPA", numeric: true },
+  { name: "lms_login_frequency_per_week", label: "LMS logins per week", numeric: true },
+];
 
 export function TeacherRoster() {
   const [search, setSearch] = React.useState("");
@@ -52,6 +77,11 @@ export function TeacherRoster() {
   const [predictError, setPredictError] = React.useState("");
   const [missingFields, setMissingFields] = React.useState([]);
   const [predictionInputs, setPredictionInputs] = React.useState({ age: "", gender: "" });
+  const [editingStudent, setEditingStudent] = React.useState(null);
+  const [editForm, setEditForm] = React.useState({});
+  const [savingStudent, setSavingStudent] = React.useState(false);
+  const [deletingStudent, setDeletingStudent] = React.useState(null);
+  const [deletePending, setDeletePending] = React.useState(false);
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => setDebounced(search.trim()), 300);
@@ -92,6 +122,47 @@ export function TeacherRoster() {
       setPredictError(err.message || "Prediction failed.");
     } finally {
       setPredicting(null);
+    }
+  }
+
+  function openStudentEditor(student) {
+    setEditingStudent(student);
+    setEditForm(Object.fromEntries(
+      STUDENT_EDIT_FIELDS.map(({ name }) => [name, student[name] ?? ""])
+    ));
+  }
+
+  async function submitStudentEdit(event) {
+    event.preventDefault();
+    const student = { student_id: editingStudent.student_id };
+    for (const { name, numeric } of STUDENT_EDIT_FIELDS) {
+      const value = editForm[name];
+      student[name] = numeric ? (value === "" ? null : Number(value)) : value;
+    }
+    setSavingStudent(true);
+    try {
+      await saveStudent(student);
+      toast.success(`${student.student_id} saved`);
+      setEditingStudent(null);
+      await students.refresh();
+    } catch (err) {
+      toast.error(err.message || "Could not save the student record.");
+    } finally {
+      setSavingStudent(false);
+    }
+  }
+
+  async function confirmStudentDelete() {
+    setDeletePending(true);
+    try {
+      await deleteStudent(deletingStudent.student_id);
+      toast.success(`${deletingStudent.student_id} deleted`);
+      setDeletingStudent(null);
+      await students.refresh();
+    } catch (err) {
+      toast.error(err.message || "Could not delete the student record.");
+    } finally {
+      setDeletePending(false);
     }
   }
 
@@ -190,19 +261,38 @@ export function TeacherRoster() {
                           {student.previous_semester_gpa != null ? formatNumber(student.previous_semester_gpa, 2) : "—"}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => selectStudentForPrediction(student)}
-                            disabled={predicting === student.student_id}
-                          >
-                            {predicting === student.student_id ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                              <Sparkles className="size-3.5" />
-                            )}
-                            Predict
-                          </Button>
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => selectStudentForPrediction(student)}
+                              disabled={predicting === student.student_id}
+                            >
+                              {predicting === student.student_id ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                              ) : (
+                                <Sparkles className="size-3.5" />
+                              )}
+                              Predict
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openStudentEditor(student)}
+                            >
+                              <Pencil className="size-3.5" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => setDeletingStudent(student)}
+                            >
+                              <Trash2 className="size-3.5" />
+                              Delete
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -268,6 +358,78 @@ export function TeacherRoster() {
           <PredictorSuite />
         </CardContent>
       </Card>
+
+      <Dialog
+        open={Boolean(editingStudent)}
+        onOpenChange={(open) => {
+          if (!open && !savingStudent) setEditingStudent(null);
+        }}
+      >
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit student record</DialogTitle>
+            <DialogDescription>
+              Update saved details for {editingStudent?.student_id}. Student ID cannot be changed.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={submitStudentEdit}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="student-edit-id">Student ID</Label>
+                <Input id="student-edit-id" value={editingStudent?.student_id || ""} readOnly />
+              </div>
+              {STUDENT_EDIT_FIELDS.map(({ name, label, numeric }) => (
+                <div key={name} className="space-y-1.5">
+                  <Label htmlFor={`student-edit-${name}`}>{label}</Label>
+                  <Input
+                    id={`student-edit-${name}`}
+                    type={numeric ? "number" : "text"}
+                    step={numeric ? "any" : undefined}
+                    value={editForm[name] ?? ""}
+                    onChange={(event) =>
+                      setEditForm((current) => ({ ...current, [name]: event.target.value }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingStudent(null)} disabled={savingStudent}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={savingStudent}>
+                {savingStudent ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                Save changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(deletingStudent)}
+        onOpenChange={(open) => {
+          if (!open && !deletePending) setDeletingStudent(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete student record?</DialogTitle>
+            <DialogDescription>
+              This permanently deletes student {deletingStudent?.student_id} and cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeletingStudent(null)} disabled={deletePending}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={confirmStudentDelete} disabled={deletePending}>
+              {deletePending ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              Delete record
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
