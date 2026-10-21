@@ -8,9 +8,9 @@ reviewing or extending it.
 - Passwords are hashed with `werkzeug.security` (never stored or logged
   in plaintext).
 - Sessions are cookie-based (`HttpOnly`, `Secure`, `SameSite=None` to
-  support the cross-origin frontend/backend split between Vercel and
-  Render), with a 30-minute idle timeout by default. Configure
-  `SESSION_IDLE_TIMEOUT_SECONDS` to change the timeout.
+  support the cross-origin frontend/backend split), with a 30-minute
+  idle timeout by default. Configure `SESSION_IDLE_TIMEOUT_SECONDS` to
+  change the timeout.
 - Admin accounts cannot be created through public self-registration —
   only through a separate endpoint gated behind an `ADMIN_SETUP_KEY`
   environment variable, so no client-side path exists for a user to
@@ -27,13 +27,18 @@ reviewing or extending it.
   email that matches the roster when one is on file, and admin approval
   before the account can log in.
 - Optional TOTP-based two-factor authentication (`pyotp`), compatible
-  with Google Authenticator / Authy.
+  with authenticator apps.
 - TOTP secrets and password-reset tokens are encrypted in MongoDB with
-  Fernet using `APP_ENCRYPTION_KEY`. Set this to a persistent Fernet key
-  (generate one with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`)
-  and store it in the deployment's secret manager; losing or rotating the
-  key without re-encrypting stored values makes them unreadable. Existing
-  plaintext values are encrypted during application startup.
+  Fernet using `APP_ENCRYPTION_KEY`. This key is required for storing or
+  reading those encrypted authentication secrets. Generate a persistent
+  Fernet key with
+  `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+  and store it securely in the deployment's secret manager. **Never
+  change or rotate `APP_ENCRYPTION_KEY`** after it has encrypted data:
+  existing encrypted values become unreadable without the original key.
+  Existing plaintext values are encrypted during application startup.
+- Passwords must be at least 10 characters and contain at least one
+  letter and one digit.
 
 ## Data access
 
@@ -45,24 +50,27 @@ reviewing or extending it.
 - Role checks (`login_required(roles=[...])`) are enforced on every
   privileged route server-side — the UI hides options a role
   shouldn't see, but the API is the actual boundary.
-- File uploads are restricted to CSV/JSON, capped at 5 MB, and
-  validated row-by-row before being written to the database.
+- Student data uploads accept CSV or JSON, are capped at 5 MB per
+  request, and are validated row-by-row before being written to the
+  database.
 
 ## Transport & headers
 
 - HTTPS is terminated by the hosting platform (Render/Vercel).
-- CORS is restricted to a single configured frontend origin — never a
-  wildcard.
-- Standard defensive headers (`X-Content-Type-Options`,
-  `X-Frame-Options`, `Referrer-Policy`) are set on every response.
+- CORS is restricted to the comma-separated origins configured in
+  `FRONTEND_ORIGIN` — never a wildcard.
+- Every response receives `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, `Strict-Transport-Security`,
+  `Referrer-Policy: no-referrer`, and a restrictive
+  `Content-Security-Policy`.
 
 ## Secrets
 
 - No API keys or credentials are shipped to the client; the frontend
   only receives a public API base URL.
-- All secrets (Mongo connection string, Flask secret key, SMTP
-  credentials, admin setup key, and encryption key) are read from
-  environment variables, never committed.
+- Runtime settings are read from environment variables. Important
+  secrets include `MONGO_URI`, `FLASK_SECRET_KEY`, `ADMIN_SETUP_KEY`,
+  `APP_ENCRYPTION_KEY`, and optional SMTP credentials.
 
 ## Known limitations
 
@@ -71,7 +79,7 @@ reviewing or extending it.
   across multiple instances.
 - No automated dependency scanning is configured; run `npm audit` and
   `pip-audit` periodically if this grows into a longer-lived project.
-- Database backups on the free MongoDB Atlas tier aren't automatic;
-  `backend/backup_db.py` provides a manual export as a stopgap.
-- There's no self-service account/data deletion flow — out of scope
-  for the current version.
+- The repository does not configure automated database backups;
+  `backend/backup_db.py` provides a manual export.
+- There is no self-service account deletion flow. Student-record deletion
+  is available in-app to admins and teachers, subject to teacher scope.

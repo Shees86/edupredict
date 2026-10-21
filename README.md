@@ -16,9 +16,9 @@ data-processing demonstrations; it is not part of the live application.
 ## Project structure
 
 ```
-EduPredict/
+.
 ├── backend/                    Flask API
-│   ├── app.py                  App factory — registers all route blueprints
+│   ├── app.py                  Flask application — registers route blueprints
 │   ├── blueprints/             Route modules: auth, admin, students,
 │   │                           predictions, alerts, dashboard, feedback, engagement
 │   ├── db.py                   MongoDB access layer
@@ -27,21 +27,23 @@ EduPredict/
 │   ├── university_predictor.py Intermediate % → university predictor wrapper
 │   ├── cgpa_predictor.py       Next-semester GPA trend predictor wrapper
 │   ├── analytics.py            Correlation & trend analysis
-│   ├── *.pkl / *_metrics.json  Pre-trained models (ready to use, no retraining needed)
+│   ├── *.pkl / *_metrics.json  Pre-trained models and training metrics
 │   ├── requirements.txt
-│   └── Procfile                Render start command
+│   ├── Procfile                Render start command
+│   └── tests/                  Backend unit tests
 │
 ├── dashboard-app/              React frontend (Vite)
 │   └── src/
 │       ├── App.jsx, main.jsx
-│       ├── lib/                API client helpers (resources.js)
+│       ├── lib/                API client helpers
 │       └── features/
 │           ├── auth/           Login / auth screens
-│           └── dashboard/      Per-role dashboards (Admin, Teacher, Student, Analyst) + predictors
+│           └── dashboard/      Role dashboards, views, CSV upload, and predictors
 │
-├── ml/                          Training scripts (outputs already committed in backend/)
+├── ml/                          Model training and sample-data scripts
 ├── spark/pyspark_pipeline.py    Optional offline HDFS cleaning and analysis pipeline
 ├── data/                        Sample datasets (CSV)
+├── .github/workflows/ci.yml     GitHub Actions tests and frontend build
 └── docs/
     ├── DEPLOYMENT.md            MongoDB Atlas + Render + Vercel deployment guide
     ├── SECURITY.md              Security design notes
@@ -53,9 +55,9 @@ EduPredict/
 | Area | Details |
 |---|---|
 | Authentication | Role-based sessions: Admin, Teacher, Student, Analyst; optional TOTP 2FA |
-| Data ingestion | CSV/JSON upload, web forms |
+| Data ingestion | Batch CSV/JSON upload and student-record forms |
 | Live application storage | MongoDB |
-| Optional offline processing | PySpark on HDFS — cleaning, feature engineering, anomaly detection |
+| Optional offline processing | PySpark on HDFS — a standalone data-processing demonstration, not part of the live app |
 | ML — dropout risk | Random Forest classifier |
 | ML — field/college predictor | Matric % → recommended field + college tier |
 | ML — university predictor | Intermediate % → suggested program + university tier |
@@ -64,18 +66,18 @@ EduPredict/
 | Real-time alerts | Server-Sent Events, pushed to Admin/Teacher/Analyst |
 | Cohort analysis | Correlation analysis, risk trends, side-by-side cohort comparison |
 | Student engagement | Progress goals, achievement badges, in-app messaging |
-| Bulk ingestion | Batch CSV/JSON ingest — 5,000 student records in a single upload |
-| Record management | In-app student edit/delete; deletes cascade to that student's predictions, alerts and goals |
-| Access scoping | Staff see only their assigned school/class; accounts without an assignment are denied (fail-closed) |
-| Security | Encrypted TOTP secrets & reset tokens, password policy (10+ chars, letter + digit), rate limiting, session idle timeout, API security headers |
-| Quality | 34 backend tests; GitHub Actions CI runs tests + production build on every PR |
+| Bulk ingestion | Batch CSV/JSON ingest (request body limit: 5 MB) |
+| Record management | Teacher dashboard supports in-app student edit/delete; deleting a student also removes related predictions, alerts, and goals |
+| Roster access scoping | Roster endpoints limit teachers to their assigned school/class and analysts to their school; unassigned staff are denied on scoped roster operations |
+| Security | Encrypted TOTP secrets and reset tokens; passwords require at least 10 characters, one letter, and one digit; rate limiting, session idle timeout, and security headers |
+| Quality | Backend unit tests; GitHub Actions runs backend tests and a frontend production build on pull requests and pushes to `main` |
 | Admin controls | Role-approval workflow, audit log, feedback queue |
 
 ## Local setup
 
 ### Prerequisites
-- Python 3.10+, Node.js 18+, MongoDB Community Server
-- Java 11, Hadoop 3.3.6, PySpark (only for the optional offline HDFS pipeline)
+- Python 3.12, Node.js 20, MongoDB (the CI workflow uses Python 3.12 and Node.js 20)
+- Java 11, Hadoop 3.3.6, and PySpark only for the optional offline HDFS demonstration
 
 ### Backend
 ```bash
@@ -83,6 +85,19 @@ cd backend
 pip install -r requirements.txt
 python app.py              # http://localhost:5000
 ```
+
+Set the backend environment variables in your shell before starting it.
+The app does not automatically load a `.env` file. For local development,
+use `MONGO_URI` for your MongoDB instance, `FLASK_SECRET_KEY` for stable
+sessions, and `APP_ENCRYPTION_KEY` for encrypted authentication secrets.
+`APP_ENCRYPTION_KEY` is required for TOTP secrets and password-reset
+tokens: generate a Fernet key with
+`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`,
+store it securely, and **never change or rotate it** after it has encrypted
+data. Changing it makes existing encrypted values unreadable. Set
+`FRONTEND_ORIGIN` to `http://localhost:5173` when using the local frontend.
+`ADMIN_SETUP_KEY` is needed to create the first admin account. See
+`backend/.env.example` for all supported settings and defaults.
 
 ### Frontend
 ```bash
@@ -119,15 +134,16 @@ There's no seed data — the database starts empty.
   no one can grant themselves admin through the UI). Set the variable,
   then:
   ```bash
-  curl -X POST https://<backend-url>/api/auth/register-admin \
+  curl -X POST https://edupredict-x3a4.onrender.com/api/auth/register-admin \
     -H "Content-Type: application/json" \
     -d '{"username":"admin","password":"...","full_name":"...","setup_key":"<ADMIN_SETUP_KEY>"}'
   ```
 
 ## Cloud deployment
 
-See `docs/DEPLOYMENT.md` for the full guide — MongoDB Atlas, Render,
-and Vercel, all on free tiers.
+The canonical deployment is the app at https://edupredict-blue.vercel.app
+and API at https://edupredict-x3a4.onrender.com. See
+`docs/DEPLOYMENT.md` for deployment configuration.
 
 ## Retraining the models
 
@@ -148,36 +164,54 @@ Spark or Hadoop.
 
 | Endpoint | Method | Roles | Purpose |
 |---|---|---|---|
-| `/api/auth/register` | POST | any | Create a Teacher/Student/Analyst account |
-| `/api/auth/register-admin` | POST | setup key required | Create an Admin account (gated) |
-| `/api/auth/login` | POST | any | Log in, sets session cookie |
-| `/api/auth/logout` | POST | any | Log out |
-| `/api/auth/me` | GET | any | Current session user |
-| `/api/students` | GET | admin/teacher/analyst | Admin access is unrestricted; teachers are limited to their assigned school and class, analysts to their assigned school |
-| `/api/students` | POST | admin/teacher | Admin access is unrestricted; teachers can only create or update records in their assigned class |
-| `/api/students/<id>` | GET | all | One student's record; staff access follows their school/class assignment |
-| `/api/admin/approve/<username>` | POST | admin | Assign teachers a school and class, and analysts a school, while approving their account |
-| `/api/cohort/compare` | GET | admin/analyst | Compare two student cohorts |
-| `/api/data/ingest` | POST | admin/teacher | Batch CSV/JSON upload; teacher uploads are limited to their assigned class |
-| `/api/predict` | POST | admin/teacher/analyst | Dropout-risk prediction |
-| `/api/predict/field` | POST | any | Field & college predictor |
-| `/api/predict/university` | POST | any | University admission predictor |
-| `/api/predict/cgpa` | POST | any | Next-semester GPA predictor |
-| `/api/alerts` | GET | admin/teacher/analyst | Unresolved high-risk alerts |
-| `/api/alerts/stream` | GET (SSE) | any | Live alert stream |
-| `/api/dashboard/summary` | GET | admin/teacher/analyst | KPI numbers |
-| `/api/model/metrics` | GET | admin/analyst | Dropout model metrics |
-| `/api/model/field-metrics` | GET | admin/analyst | Field model metrics |
-| `/api/model/university-metrics` | GET | admin/analyst | University model metrics |
-| `/api/analytics/correlations` | GET | admin/analyst | Feature correlation with dropout risk |
-| `/api/analytics/trend` | GET | admin/analyst | Cohort risk trend |
-| `/api/feedback` | GET/POST | admin (GET) / any (POST) | Feedback & support |
-| `/api/goals`, `/api/badges/<id>` | GET/POST | student and above | Progress goals, achievement badges |
-| `/api/messages` | GET/POST | admin/teacher/student | In-app messaging |
-| `/api/audit-log` | GET | admin | Admin action history |
-| `/api/health` | GET | — | Health check |
+| `/api/auth/register` | POST | Public | Register a Teacher, Student, or Analyst |
+| `/api/auth/register-admin` | POST | Public + setup key | Create an Admin account |
+| `/api/auth/login` | POST | Public | Log in; starts pending 2FA verification when enabled |
+| `/api/auth/login/verify-2fa` | POST | Pending 2FA login | Complete login with a TOTP code |
+| `/api/auth/logout` | POST | Public | Log out the current user |
+| `/api/auth/me` | GET | Authenticated | Get the current session user |
+| `/api/auth/forgot-password` | POST | Public | Request a password-reset link |
+| `/api/auth/reset-password` | POST | Public + reset token | Set a password using a reset token |
+| `/api/auth/change-password` | POST | Authenticated | Change the current user's password |
+| `/api/auth/2fa/setup` | POST | Authenticated | Create a TOTP secret and provisioning URI |
+| `/api/auth/2fa/confirm` | POST | Authenticated | Confirm and enable TOTP |
+| `/api/auth/2fa/disable` | POST | Authenticated | Disable TOTP after password or code verification |
+| `/api/admin/pending-users` | GET | Admin | List pending accounts and staff awaiting assignment |
+| `/api/admin/approve/<username>` | POST | Admin | Approve an account and assign teacher school/class or analyst school |
+| `/api/admin/reject/<username>` | POST | Admin | Reject an account |
+| `/api/students` | GET | Admin, Teacher, Analyst | Search/list students; Teacher is scoped to school/class, Analyst to school |
+| `/api/students` | POST | Admin, Teacher | Create or update a student; Teacher is scoped to assigned class |
+| `/api/students/<student_id>` | GET | Admin, Teacher, Analyst, Student | Get a record; Student can access only their own, staff are scoped |
+| `/api/students/<student_id>` | DELETE | Admin, Teacher | Delete a record and related predictions, alerts, and goals; Teacher is scoped |
+| `/api/cohort/compare` | GET | Admin, Analyst | Compare two filtered cohorts |
+| `/api/data/ingest` | POST | Admin, Teacher | Batch CSV/JSON ingest; Teacher uploads are scoped to assigned class |
+| `/api/predict` | POST | Admin, Teacher, Analyst | Predict dropout risk |
+| `/api/predict/field` | POST | Any authenticated user | Predict field/college recommendation |
+| `/api/predict/university` | POST | Any authenticated user | Predict university/program recommendation |
+| `/api/predict/cgpa` | POST | Any authenticated user | Predict next-semester GPA |
+| `/api/alerts` | GET | Admin, Teacher, Analyst | List unresolved alerts |
+| `/api/alerts/stream` | GET (SSE) | Admin, Teacher, Analyst | Stream live alerts |
+| `/api/alerts/<alert_id>/resolve` | POST | Admin, Teacher | Resolve an alert |
+| `/api/dashboard/summary` | GET | Admin, Teacher, Analyst | Get dashboard summary |
+| `/api/model/metrics`, `/api/model/field-metrics`, `/api/model/university-metrics` | GET | Admin, Analyst | Get model metrics |
+| `/api/analytics/correlations`, `/api/analytics/trend` | GET | Admin, Analyst | Get correlation and trend analytics |
+| `/api/feedback` | POST | Any authenticated user | Submit feedback |
+| `/api/feedback` | GET | Admin | List feedback |
+| `/api/feedback/<feedback_id>/resolve` | POST | Admin | Resolve feedback |
+| `/api/goals/<student_id>` | GET | Admin, Teacher, Analyst, Student | Read a goal; Student can read only their own |
+| `/api/goals` | POST | Student | Set the current student's goal |
+| `/api/badges/<student_id>` | GET | Admin, Teacher, Analyst, Student | Read badges; Student can read only their own |
+| `/api/messages/conversations`, `/api/messages/<other_user>` | GET | Admin, Teacher, Student | List conversations or read a conversation |
+| `/api/messages` | POST | Admin, Teacher, Student | Send a message |
+| `/api/notifications/preferences` | GET, POST, PUT | Authenticated | Read or update notification preferences |
+| `/api/audit-log` | GET | Admin | Read the admin action log |
+| `/api/system/stats` | GET | Admin | Read process and record statistics |
+| `/api/health` | GET | Public | Health check |
 
-Roster records use `school_id` and `class_id` to enforce staff access. Include these columns when an administrator imports existing roster data; teachers receive their assigned values on uploads, and records outside their class cannot be overwritten.
+Roster records use `school_id` and `class_id` to enforce staff access.
+Include these columns when importing existing roster data. Teacher
+uploads and edits receive the assigned scope, and records outside that
+scope cannot be overwritten or deleted.
 
 ## Security
 

@@ -1,7 +1,10 @@
 # EduPredict — Cloud Deployment Guide
 
-Deploying EduPredict to the cloud means it runs from a single URL in
-any browser, with no local Hadoop/MongoDB/Python setup required.
+The canonical deployed application is
+https://edupredict-blue.vercel.app and its API is
+https://edupredict-x3a4.onrender.com. The steps below describe deploying
+your own instance; when creating a separate deployment, use the URLs
+assigned to your own Render and Vercel services instead.
 
 ---
 
@@ -12,11 +15,8 @@ any browser, with no local Hadoop/MongoDB/Python setup required.
 3. Under **Database Access**: create a user, e.g. username `edupredict`,
    generate a password — **save it**, you'll need it.
 4. Under **Network Access**, allow only the specific IP addresses or
-   ranges that need database access: your current public IP for local
-   administration and the outbound IP addresses/ranges provided for
-   your Render service. If Render does not provide stable outbound IPs
-   for your plan, use a supported private-network or static-egress
-   option. Do not allow access from anywhere (0.0.0.0/0).
+   ranges that need database access. Do not allow access from anywhere
+   (`0.0.0.0/0`).
 5. Click **Connect** → **Drivers** → copy the connection string. It
    looks like:
    ```
@@ -28,12 +28,11 @@ any browser, with no local Hadoop/MongoDB/Python setup required.
 
 1. Go to https://github.com and create a free account if you don't have one.
 2. Create a new repository, e.g. `edupredict`.
-3. On your laptop, in the `EduPredict` folder:
+3. On your computer, in the repository folder:
    ```bash
    git init
    git add .
    git commit -m "EduPredict initial commit"
-   git branch -M main
    git remote add origin https://github.com/<your-username>/edupredict.git
    git push -u origin main
    ```
@@ -46,18 +45,24 @@ any browser, with no local Hadoop/MongoDB/Python setup required.
    - **Root Directory**: `backend`
    - **Runtime**: Python 3
    - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn app:app --bind 0.0.0.0:$PORT --worker-class gthread --threads 4 --timeout 120`
-   - **Instance type**: Free
+   - **Start Command**: use the command in `backend/Procfile`.
 4. Under **Environment Variables**, add:
    | Key | Value |
    |---|---|
    | `MONGO_URI` | (the connection string from Step 1) |
-   | `FLASK_SECRET_KEY` | a unique, cryptographically strong generated secret (for example, generate one with `python -c "import secrets; print(secrets.token_urlsafe(48))"`); do not use a guessable or reused value |
-   | `FRONTEND_ORIGIN` | (leave blank for now, fill in after Step 4) |
+   | `MONGO_DB_NAME` | `edupredict` (optional; this is the default) |
+   | `FLASK_SECRET_KEY` | A unique, cryptographically strong generated secret; do not use a guessable or reused value |
+   | `APP_ENCRYPTION_KEY` | A persistent Fernet key, generated with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+   | `FRONTEND_ORIGIN` | `https://edupredict-blue.vercel.app` for the canonical app; for a separate deployment, use its frontend URL |
    | `ADMIN_SETUP_KEY` | any random string — this is required to create the first Admin account, see "Creating accounts" in the main README |
+
+   **Never change or rotate `APP_ENCRYPTION_KEY`** after encrypted TOTP
+   secrets or reset tokens have been stored. Changing it makes those
+   values unreadable; retain the original key securely.
 5. Click **Create Web Service**. Wait for it to build and deploy.
-6. Once live, copy the URL Render gives you, e.g.
-   `https://edupredict-backend.onrender.com` — **save this.**
+6. For the canonical deployment, the API URL is
+   `https://edupredict-x3a4.onrender.com`. For a separate service, use
+   the URL assigned by Render.
 
 ## Step 4: Initialize the cloud database
 
@@ -76,24 +81,27 @@ in Step 3.
 4. Under **Environment Variables**, add:
    | Key | Value |
    |---|---|
-   | `VITE_API_BASE` | `https://edupredict-backend.onrender.com/api` (your Render URL from Step 3, + `/api`) |
-5. Click **Deploy**. Once live, copy the URL Vercel gives you, e.g.
-   `https://edupredict.vercel.app` — **save this.**
+   | `VITE_API_BASE` | `https://edupredict-x3a4.onrender.com/api` for the canonical API; for a separate deployment, append `/api` to its API URL |
+5. Click **Deploy**. The canonical app URL is
+   `https://edupredict-blue.vercel.app`; for a separate project, use the
+   URL assigned by Vercel.
 
 ## Step 6: Connect the two
 
 Go back to Render → your backend service → **Environment** → set:
 | Key | Value |
 |---|---|
-| `FRONTEND_ORIGIN` | `https://edupredict.vercel.app` (your Vercel URL from Step 5) |
+| `FRONTEND_ORIGIN` | `https://edupredict-blue.vercel.app` for the canonical app; otherwise use the URL assigned to your frontend |
 
-Save — Render will redeploy automatically.
+Set this to the frontend origin for your deployment and redeploy the
+backend if the environment change does not trigger a deploy.
 
 ## Step 7: Test it
 
-Open `https://edupredict.vercel.app` in a browser on ANY computer (or
-your phone). Log in with the demo credentials. Everything should work
-exactly like it did locally — because it's the same code, just hosted.
+Open https://edupredict-blue.vercel.app for the canonical deployment (or
+your own frontend URL for an independent deployment). There are no
+pre-seeded demo credentials; create the first admin account with the
+`ADMIN_SETUP_KEY` using the instructions in the main README.
 
 ---
 
@@ -102,13 +110,11 @@ exactly like it did locally — because it's the same code, just hosted.
 Hadoop/HDFS/PySpark is an optional offline data-processing demonstration,
 not part of the live application or model-training data path. The Spark
 pipeline reads the sample CSV from HDFS and writes cleaned Parquet, but
-`ml/train_model.py` always reads `data/students_sample.csv` and does not
-consume that Parquet output. The live backend scores predictions using
-the saved pickle model and encoders; the deployed app does not run Spark
-or Hadoop.
+`ml/train_model.py` reads `data/students_sample.csv` and does not consume
+that Parquet output. The live backend scores predictions using the saved
+pickle model and encoders; the deployed app does not run Spark or Hadoop.
 
-## Render free-tier note
+## Hosting availability note
 
-Free Render web services "sleep" after ~15 minutes of inactivity and
-take ~30-60 seconds to wake up on the next request. Open the app once
-a few minutes before your demo starts so it's already awake.
+Hosting availability and wake-up behavior depend on the selected Render
+plan; consult the provider's current documentation for its service limits.
