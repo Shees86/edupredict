@@ -4,7 +4,7 @@ import os
 import tempfile
 import time
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 from cryptography.fernet import Fernet
@@ -81,7 +81,10 @@ class SensitiveStorageTests(unittest.TestCase):
             "_id": "user-id",
             "username": "alice",
             "reset_token_hash": token_hash,
-            "reset_token_expires": datetime.utcnow() + timedelta(minutes=5),
+            "reset_token_expires": (
+                datetime.now(timezone.utc).replace(tzinfo=None)
+                + timedelta(minutes=5)
+            ),
         }
         update_one.return_value.modified_count = 1
 
@@ -114,7 +117,7 @@ class BackupTests(unittest.TestCase):
             "totp_secret": "encrypted-totp",
             "reset_token": "encrypted-reset-token",
             "reset_token_hash": "reset-hash",
-            "reset_token_expires": datetime.utcnow().isoformat(),
+            "reset_token_expires": datetime.now(timezone.utc).isoformat(),
         }
         collections["users"].find.side_effect = lambda query, projection: [
             {

@@ -1,3 +1,4 @@
+import hmac
 import os
 from flask import Blueprint, request, jsonify, session
 import db
@@ -71,7 +72,14 @@ def register_admin():
         return jsonify({"error": "Admin registration is disabled (no ADMIN_SETUP_KEY configured on the server)."}), 403
 
     data = request.get_json(force=True)
-    if data.get("setup_key") != setup_key:
+    supplied_setup_key = data.get("setup_key")
+    if (
+        not isinstance(supplied_setup_key, str)
+        or not hmac.compare_digest(
+            supplied_setup_key.encode("utf-8"),
+            setup_key.encode("utf-8"),
+        )
+    ):
         return jsonify({"error": "Incorrect setup key."}), 403
 
     username = data.get("username")

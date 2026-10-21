@@ -10,7 +10,7 @@ Export only — restore manually via mongoimport if needed.
 
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 import db
 
@@ -41,7 +41,7 @@ def default_serializer(obj):
 
 
 def main():
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backups", timestamp)
     os.makedirs(backup_dir, exist_ok=True)
 
