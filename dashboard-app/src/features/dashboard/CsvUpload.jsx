@@ -1,9 +1,15 @@
 import * as React from "react";
-import { Loader2, UploadCloud } from "lucide-react";
+import { FileText, Loader2, UploadCloud, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiPostFile } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} bytes`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 /**
  * CSV/JSON ingestion. Kept as a compact drop zone rather than a full
@@ -52,10 +58,7 @@ export function CsvUpload({ onUploaded, className }) {
         e.preventDefault();
         setDragging(false);
         const dropped = e.dataTransfer.files?.[0];
-        if (dropped) {
-          setFile(dropped);
-          upload(dropped);
-        }
+        if (dropped) setFile(dropped);
       }}
     >
       <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -64,9 +67,17 @@ export function CsvUpload({ onUploaded, className }) {
         </div>
         <div className="min-w-0">
           <div className="text-[0.8125rem] font-medium">Upload student records</div>
-          <p className="truncate text-[0.6875rem] text-muted-foreground">
-            CSV or JSON · requires <code className="font-mono">student_id</code> · existing rows are updated
-          </p>
+          {file ? (
+            <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
+              <FileText className="size-3.5 shrink-0" aria-hidden="true" />
+              <span className="truncate" title={file.name}>{file.name}</span>
+              <span className="shrink-0">· {formatFileSize(file.size)}</span>
+            </div>
+          ) : (
+            <p className="truncate text-[0.6875rem] text-muted-foreground">
+              CSV or JSON · requires <code className="font-mono">student_id</code> · existing rows are updated
+            </p>
+          )}
         </div>
       </div>
 
@@ -87,13 +98,28 @@ export function CsvUpload({ onUploaded, className }) {
         >
           Choose file
         </Button>
+        {file ? (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => {
+              setFile(null);
+              if (inputRef.current) inputRef.current.value = "";
+            }}
+            disabled={uploading}
+            aria-label="Clear selected file"
+            title="Clear selected file"
+          >
+            <X className="size-4" />
+          </Button>
+        ) : null}
         <Button
           size="sm"
           onClick={() => upload(file)}
           disabled={!file || uploading}
         >
           {uploading ? <Loader2 className="size-3.5 animate-spin" /> : null}
-          {uploading ? "Uploading…" : file ? "Upload" : "Upload"}
+          {uploading ? "Uploading…" : "Upload"}
         </Button>
       </div>
     </div>
