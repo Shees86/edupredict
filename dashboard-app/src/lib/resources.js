@@ -23,20 +23,21 @@ export async function getStudent(studentId) {
   return apiGet(`/students/${encodeURIComponent(studentId)}`);
 }
 
-export async function predictRisk(student) {
+export async function predictRisk(student, overrides = {}) {
+  const inputs = { ...student, ...overrides };
   return apiPost("/predict", {
-    student_id: student.student_id,
-    ...(student.age != null && String(student.age).trim() !== "" ? { age: student.age } : {}),
-    attendance_rate: student.attendance_rate,
-    avg_test_score: student.avg_test_score,
-    assignments_submitted_pct: student.assignments_submitted_pct ?? 70,
-    study_hours_per_week: student.study_hours_per_week ?? 8,
-    previous_semester_gpa: student.previous_semester_gpa,
-    lms_login_frequency_per_week: student.lms_login_frequency_per_week ?? 5,
-    ...(student.gender != null && String(student.gender).trim() !== "" ? { gender: student.gender } : {}),
-    family_income_level: student.family_income_level || "Medium",
-    parental_education: student.parental_education || "Secondary",
-    extracurricular: student.extracurricular || "No",
+    student_id: inputs.student_id,
+    ...(inputs.age != null && String(inputs.age).trim() !== "" ? { age: inputs.age } : {}),
+    attendance_rate: inputs.attendance_rate,
+    avg_test_score: inputs.avg_test_score,
+    assignments_submitted_pct: inputs.assignments_submitted_pct ?? 70,
+    study_hours_per_week: inputs.study_hours_per_week ?? 8,
+    previous_semester_gpa: inputs.previous_semester_gpa,
+    lms_login_frequency_per_week: inputs.lms_login_frequency_per_week ?? 5,
+    ...(inputs.gender != null && String(inputs.gender).trim() !== "" ? { gender: inputs.gender } : {}),
+    family_income_level: inputs.family_income_level || "Medium",
+    parental_education: inputs.parental_education || "Secondary",
+    extracurricular: inputs.extracurricular || "No",
   });
 }
 
