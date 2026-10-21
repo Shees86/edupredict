@@ -124,7 +124,10 @@ def delete_student(student_id):
         return jsonify({"error": str(error)}), 403
     if not deleted:
         return jsonify({"error": "Not found"}), 404
-    return jsonify({"message": "Deleted"}), 200
+    return jsonify({
+        "message": "Deleted",
+        "related_documents_deleted": deleted,
+    }), 200
 
 
 @students_bp.route("/students", methods=["POST"])

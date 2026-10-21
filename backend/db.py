@@ -341,7 +341,11 @@ def delete_student(student_id, scope=None):
         query.update(scope)
     result = students_col.delete_one(query)
     if result.deleted_count:
-        return True
+        return {
+            "predictions": predictions_col.delete_many({"student_id": student_id}).deleted_count,
+            "alerts": alerts_col.delete_many({"student_id": student_id}).deleted_count,
+            "goals": goals_col.delete_many({"student_id": student_id}).deleted_count,
+        }
     if scope and students_col.find_one({"student_id": student_id}, {"_id": 1}):
         raise PermissionError("Student is outside your assigned class or school")
     return False
