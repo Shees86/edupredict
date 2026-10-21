@@ -216,3 +216,9 @@ scope cannot be overwritten or deleted.
 ## Security
 
 See `docs/SECURITY.md` for authentication, data-access, and secrets-handling notes.
+
+## License
+
+Copyright © 2026 Muhammad Shees. All rights reserved. See [LICENSE](LICENSE)
+for details — this is not an open-source project; copying, reuse, or
+submission of this work without written permission is prohibited.
