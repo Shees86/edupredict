@@ -1,4 +1,5 @@
 import {
+  apiDelete,
   apiGet,
   apiPost,
 } from "@/lib/api";
@@ -21,6 +22,14 @@ export async function listStudents(search = "") {
 
 export async function getStudent(studentId) {
   return apiGet(`/students/${encodeURIComponent(studentId)}`);
+}
+
+export async function saveStudent(student) {
+  return apiPost("/students", student);
+}
+
+export async function deleteStudent(studentId) {
+  return apiDelete(`/students/${encodeURIComponent(studentId)}`);
 }
 
 export async function predictRisk(student, overrides = {}) {

@@ -46,6 +46,15 @@ export async function apiPost(path, body) {
   return res.json();
 }
 
+export async function apiDelete(path) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) throw apiError(await readError(res, "Request failed"), res.status);
+  return res.json();
+}
+
 export async function apiPostFile(path, file) {
   const formData = new FormData();
   formData.append("file", file);

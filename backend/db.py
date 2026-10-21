@@ -335,6 +335,18 @@ def get_student(student_id, scope=None):
     return students_col.find_one(query, {"_id": 0})
 
 
+def delete_student(student_id, scope=None):
+    query = {"student_id": student_id}
+    if scope:
+        query.update(scope)
+    result = students_col.delete_one(query)
+    if result.deleted_count:
+        return True
+    if scope and students_col.find_one({"student_id": student_id}, {"_id": 1}):
+        raise PermissionError("Student is outside your assigned class or school")
+    return False
+
+
 def roster_email(student_record):
     """Email on file for a roster row, if the institution stored one."""
     if not student_record:

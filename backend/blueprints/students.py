@@ -109,6 +109,24 @@ def get_student(student_id):
     return jsonify(student), 200
 
 
+@students_bp.route("/students/<student_id>", methods=["DELETE"])
+@login_required(roles=["admin", "teacher"])
+def delete_student(student_id):
+    user = session["user"]
+    scope = {}
+    if user["role"] == "teacher":
+        scope = db.student_scope_for_user(user["username"], user["role"])
+        if scope is None:
+            return jsonify({"error": "Your account is not assigned to a school or class"}), 403
+    try:
+        deleted = db.delete_student(student_id, scope=scope or None)
+    except PermissionError as error:
+        return jsonify({"error": str(error)}), 403
+    if not deleted:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({"message": "Deleted"}), 200
+
+
 @students_bp.route("/students", methods=["POST"])
 @login_required(roles=["admin", "teacher"])
 def upsert_student():
