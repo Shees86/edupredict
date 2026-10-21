@@ -123,6 +123,9 @@ export function AppShell({
         {alertSlot ? <div className="px-4 pt-4 sm:px-6 lg:px-8">{alertSlot}</div> : null}
         <main className="mx-auto w-full max-w-[84rem] px-4 pt-6 pb-16 sm:px-6 lg:px-8">
           {children}
+          <footer className="mt-12 border-t border-border/70 pt-4 text-center text-[0.6875rem] text-muted-foreground/70">
+            Built by Muhammad Shees · © 2026
+          </footer>
         </main>
       </div>
     </div>

@@ -1,3 +1,4 @@
+# EduPredict — © 2026 Muhammad Shees — All Rights Reserved
 import os
 import time
 import secrets
@@ -115,6 +116,17 @@ app.register_blueprint(engagement_bp)
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"}), 200
+
+
+@app.route("/api/about", methods=["GET"])
+def about():
+    return jsonify(
+        {
+            "project": "EduPredict",
+            "author": "Muhammad Shees",
+            "copyright": "© 2026 Muhammad Shees — All Rights Reserved",
+        }
+    ), 200
 
 
 # ---------------------------------------------------------------

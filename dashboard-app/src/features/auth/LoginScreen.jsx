@@ -646,6 +646,9 @@ function AuthLayout({ children, onBack }) {
 
           {children}
         </div>
+        <p className="mt-8 text-center text-[0.6875rem] text-muted-foreground/70">
+          Built by Muhammad Shees · © 2026
+        </p>
       </main>
     </div>
   );

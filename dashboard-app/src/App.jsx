@@ -1,3 +1,4 @@
+// EduPredict — © 2026 Muhammad Shees — All Rights Reserved
 import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
