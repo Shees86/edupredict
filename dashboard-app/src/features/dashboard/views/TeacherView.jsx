@@ -30,6 +30,8 @@ import { PredictorSuite } from "@/features/dashboard/PredictorSuite";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -47,6 +49,8 @@ export function TeacherRoster() {
   const [predicting, setPredicting] = React.useState(null);
   const [result, setResult] = React.useState(null);
   const [predictError, setPredictError] = React.useState("");
+  const [missingFields, setMissingFields] = React.useState([]);
+  const [predictionInputs, setPredictionInputs] = React.useState({ age: "", gender: "" });
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => setDebounced(search.trim()), 300);
@@ -56,13 +60,27 @@ export function TeacherRoster() {
   const students = useAsync(() => listStudents(debounced), [debounced]);
   const rows = students.data || [];
 
-  async function runPrediction(student) {
+  function selectStudentForPrediction(student) {
     setSelected(student);
+    setResult(null);
+    setPredictError("");
+    const missing = ["age", "gender"].filter(
+      (field) => student[field] == null || String(student[field]).trim() === ""
+    );
+    setMissingFields(missing);
+    setPredictionInputs({ age: "", gender: "" });
+    if (missing.length === 0) {
+      runPrediction(student);
+    }
+  }
+
+  async function runPrediction(student, overrides = {}) {
     setPredicting(student.student_id);
     setResult(null);
     setPredictError("");
+    setMissingFields([]);
     try {
-      const response = await predictRisk(student);
+      const response = await predictRisk(student, overrides);
       setResult(response);
       toast.success(`${student.student_id}: ${response.risk_label}`);
     } catch (err) {
@@ -163,7 +181,7 @@ export function TeacherRoster() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => runPrediction(student)}
+                            onClick={() => selectStudentForPrediction(student)}
                             disabled={predicting === student.student_id}
                           >
                             {predicting === student.student_id ? (
@@ -188,6 +206,17 @@ export function TeacherRoster() {
           result={result}
           error={predictError}
           predicting={Boolean(predicting)}
+          missingFields={missingFields}
+          predictionInputs={predictionInputs}
+          onInputChange={(field, value) =>
+            setPredictionInputs((current) => ({ ...current, [field]: value }))
+          }
+          onSubmit={() => {
+            const overrides = {};
+            if (missingFields.includes("age")) overrides.age = Number(predictionInputs.age);
+            if (missingFields.includes("gender")) overrides.gender = predictionInputs.gender.trim();
+            runPrediction(selected, overrides);
+          }}
         />
       </div>
 
@@ -206,7 +235,16 @@ export function TeacherRoster() {
   );
 }
 
-function PredictionPanel({ student, result, error, predicting }) {
+function PredictionPanel({
+  student,
+  result,
+  error,
+  predicting,
+  missingFields,
+  predictionInputs,
+  onInputChange,
+  onSubmit,
+}) {
   const chartData = result
     ? [
         { label: "Probability", value: Math.round(result.risk_probability * 100), fill: "var(--chart-3)" },
@@ -237,6 +275,44 @@ function PredictionPanel({ student, result, error, predicting }) {
           </div>
         ) : error ? (
           <ErrorState message={error} />
+        ) : missingFields.length > 0 ? (
+          <form
+            className="space-y-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onSubmit();
+            }}
+          >
+            <p className="text-[0.75rem] text-muted-foreground">
+              Enter the missing details for this prediction. These values won’t be saved to the student record.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {missingFields.map((field) => (
+                <div key={field} className="space-y-1.5">
+                  <Label htmlFor={`prediction-${field}`}>
+                    {field === "age" ? "Age" : "Gender"}
+                  </Label>
+                  <Input
+                    id={`prediction-${field}`}
+                    type={field === "age" ? "number" : "text"}
+                    min={field === "age" ? 1 : undefined}
+                    max={field === "age" ? 120 : undefined}
+                    step={field === "age" ? 1 : undefined}
+                    pattern={field === "gender" ? ".*\\S.*" : undefined}
+                    title={field === "gender" ? "Enter a gender value." : undefined}
+                    placeholder={field === "gender" ? "e.g. Female" : undefined}
+                    value={predictionInputs[field]}
+                    onChange={(event) => onInputChange(field, event.target.value)}
+                    required
+                  />
+                </div>
+              ))}
+            </div>
+            <Button type="submit" size="sm" disabled={predicting}>
+              <Sparkles className="size-3.5" />
+              Run prediction
+            </Button>
+          </form>
         ) : !result ? (
           <EmptyState
             icon={Sparkles}
