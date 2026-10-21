@@ -6,6 +6,13 @@ visualizes institutional data — built with Flask, MongoDB, and React.
 An optional offline Hadoop/HDFS and PySpark pipeline is included for
 data-processing demonstrations; it is not part of the live application.
 
+## Live demo
+
+- **App:** https://edupredict-blue.vercel.app
+- **API:** https://edupredict-x3a4.onrender.com
+
+[![CI](https://github.com/shees-swe/edupredict/actions/workflows/ci.yml/badge.svg)](https://github.com/shees-swe/edupredict/actions/workflows/ci.yml)
+
 ## Project structure
 
 ```
@@ -27,11 +34,10 @@ EduPredict/
 ├── dashboard-app/              React frontend (Vite)
 │   └── src/
 │       ├── App.jsx, main.jsx
-│       ├── EduPredict-Dashboard.jsx   Landing page, auth, top-level layout
-│       └── dashboard/
-│           ├── shared.jsx      API helpers, theme, shared UI components
-│           ├── predictors.jsx  Field/university/CGPA predictor widgets
-│           └── views/          Per-role dashboards (Admin, Teacher, Student, Analyst)
+│       ├── lib/                API client helpers (resources.js)
+│       └── features/
+│           ├── auth/           Login / auth screens
+│           └── dashboard/      Per-role dashboards (Admin, Teacher, Student, Analyst) + predictors
 │
 ├── ml/                          Training scripts (outputs already committed in backend/)
 ├── spark/pyspark_pipeline.py    Optional offline HDFS cleaning and analysis pipeline
@@ -58,6 +64,11 @@ EduPredict/
 | Real-time alerts | Server-Sent Events, pushed to Admin/Teacher/Analyst |
 | Cohort analysis | Correlation analysis, risk trends, side-by-side cohort comparison |
 | Student engagement | Progress goals, achievement badges, in-app messaging |
+| Bulk ingestion | Batch CSV/JSON ingest — 5,000 student records in a single upload |
+| Record management | In-app student edit/delete; deletes cascade to that student's predictions, alerts and goals |
+| Access scoping | Staff see only their assigned school/class; accounts without an assignment are denied (fail-closed) |
+| Security | Encrypted TOTP secrets & reset tokens, password policy (10+ chars, letter + digit), rate limiting, session idle timeout, API security headers |
+| Quality | 34 backend tests; GitHub Actions CI runs tests + production build on every PR |
 | Admin controls | Role-approval workflow, audit log, feedback queue |
 
 ## Local setup
