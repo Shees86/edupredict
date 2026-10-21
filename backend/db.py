@@ -3,7 +3,8 @@ import numbers
 import os
 import secrets
 import hashlib
-from datetime import datetime, timedelta
+import hmac
+from datetime import datetime, timedelta, timezone
 from cryptography.fernet import Fernet, InvalidToken
 from pymongo import MongoClient, UpdateOne
 from pymongo.errors import BulkWriteError, DuplicateKeyError
@@ -140,7 +141,7 @@ def create_user(username, password, role, full_name="", email=""):
         "status": status,
         "notification_prefs": {"email_alerts": True, "in_app_alerts": True},
         "totp_enabled": False,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
     }
     result = users_col.insert_one(doc)
     return str(result.inserted_id), None
@@ -647,7 +648,7 @@ def save_prediction(student_id, risk_label, risk_probability, features_used):
         "risk_label": risk_label,
         "risk_probability": risk_probability,
         "features_used": features_used,
-        "predicted_at": datetime.utcnow(),
+        "predicted_at": datetime.now(timezone.utc),
     })
 
 
@@ -656,7 +657,7 @@ def create_alert(student_id, message, severity="high"):
         "student_id": student_id,
         "message": message,
         "severity": severity,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
         "resolved": False,
     })
 
@@ -690,7 +691,7 @@ def create_feedback(username, role, category, message):
         "category": category,
         "message": message,
         "status": "open",
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
     }
     result = feedback_col.insert_one(doc)
     return str(result.inserted_id)
@@ -760,7 +761,7 @@ def create_reset_token(username):
         {"$set": {
             "reset_token": _encrypt_sensitive(token),
             "reset_token_hash": hashlib.sha256(token.encode("utf-8")).hexdigest(),
-            "reset_token_expires": datetime.utcnow() + timedelta(minutes=30),
+            "reset_token_expires": datetime.now(timezone.utc) + timedelta(minutes=30),
         }},
     )
     return token
@@ -776,12 +777,20 @@ def reset_password_with_token(token, new_password):
             {"reset_token": token},
         ],
     })
-    now = datetime.utcnow()
-    if not user or not user.get("reset_token_expires") or user["reset_token_expires"] < now:
+    now = datetime.now(timezone.utc)
+    expires_at = user.get("reset_token_expires") if user else None
+    if expires_at is not None and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if not user or not expires_at or expires_at < now:
         return False
+    stored_token_hash = user.get("reset_token_hash")
+    has_matching_hash = (
+        isinstance(stored_token_hash, str)
+        and hmac.compare_digest(stored_token_hash, token_hash)
+    )
     token_query = (
         {"reset_token_hash": token_hash}
-        if user.get("reset_token_hash") == token_hash
+        if has_matching_hash
         else {"reset_token": token}
     )
     result = users_col.update_one(
@@ -838,7 +847,7 @@ def log_action(actor_username, actor_role, action, target="", details=""):
         "action": action,
         "target": target,
         "details": details,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
     })
 
 
@@ -860,7 +869,7 @@ def count_audit_log():
 def set_goal(student_id, goal_type, target_value):
     goals_col.update_one(
         {"student_id": student_id},
-        {"$set": {"student_id": student_id, "goal_type": goal_type, "target_value": target_value, "updated_at": datetime.utcnow()}},
+        {"$set": {"student_id": student_id, "goal_type": goal_type, "target_value": target_value, "updated_at": datetime.now(timezone.utc)}},
         upsert=True,
     )
 
@@ -879,7 +888,7 @@ def send_message(sender, recipient, sender_role, text):
         "recipient": recipient,
         "text": text,
         "read": False,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
     })
 
 

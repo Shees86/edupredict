@@ -93,11 +93,11 @@ def _track_request_end(response):
 
 @app.after_request
 def _apply_security_headers(response):
-    # Baseline security headers (safe defaults that won't break the app,
-    # unlike a strict CSP which would need per-asset allowlisting).
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
     return response
 
 
