@@ -1,5 +1,6 @@
+import io
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from flask import Flask
 from pymongo.errors import DuplicateKeyError
@@ -99,11 +100,12 @@ class StudentScopingTests(unittest.TestCase):
             "class_id": "class-7",
         }, scope=scope)
 
-    @patch("blueprints.students.db.upsert_student")
+    @patch("blueprints.students.db.bulk_upsert_students")
     @patch("blueprints.students.db.student_scope_for_user")
-    def test_teacher_upload_assigns_scope_to_each_record(self, get_scope, upsert_student):
+    def test_teacher_upload_assigns_scope_to_each_record(self, get_scope, bulk_upsert):
         scope = {"school_id": "school-a", "class_id": "class-7"}
         get_scope.return_value = scope
+        bulk_upsert.return_value = (1, [])
         self.login_as("teacher")
 
         response = self.client.post("/api/data/ingest", json=[{
@@ -114,11 +116,52 @@ class StudentScopingTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["inserted"], 1)
-        upsert_student.assert_called_once_with({
+        bulk_upsert.assert_called_once_with([{
             "student_id": "s1",
             "school_id": "school-a",
             "class_id": "class-7",
-        }, scope=scope)
+        }], scope=scope)
+
+    @patch("db.students_col.bulk_write")
+    def test_bulk_upsert_writes_in_batches_of_one_thousand(self, bulk_write):
+        bulk_write.side_effect = [
+            MagicMock(matched_count=1000, upserted_count=0),
+            MagicMock(matched_count=1, upserted_count=0),
+        ]
+        records = [{"student_id": f"s{i}"} for i in range(1001)]
+
+        inserted, errors = db.bulk_upsert_students(records)
+
+        self.assertEqual(inserted, 1001)
+        self.assertEqual(errors, [])
+        self.assertEqual([len(call.args[0]) for call in bulk_write.call_args_list], [1000, 1])
+        operation = bulk_write.call_args_list[0].args[0][0]
+        self.assertEqual(operation._filter, {"student_id": "s0"})
+        self.assertTrue(operation._upsert)
+
+    @patch("blueprints.students.db.bulk_upsert_students", return_value=(1, []))
+    def test_csv_ingest_converts_numeric_fields_and_preserves_row_errors(self, bulk_upsert):
+        self.login_as("admin")
+
+        response = self.client.post("/api/data/ingest", data={
+            "file": (
+                io.BytesIO(b"student_id,age\ns1,20\n,30\ns2,not-a-number\n"),
+                "students.csv",
+            ),
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {
+            "message": "Ingestion complete",
+            "format": "csv",
+            "inserted": 1,
+            "skipped": 1,
+            "errors": [{"row": 2, "error": "age must be a number"}],
+        })
+        bulk_upsert.assert_called_once_with(
+            [{"student_id": "s1", "age": 20.0}],
+            scope=None,
+        )
 
     @patch("db.students_col.update_one")
     def test_scoped_upsert_targets_only_assigned_class(self, update_one):

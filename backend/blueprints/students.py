@@ -148,7 +148,8 @@ def ingest_csv():
     }
 
     def ingest_rows(rows, csv_input=False):
-        inserted, skipped, errors = 0, 0, []
+        skipped, errors = 0, []
+        prepared_docs, prepared_rows = [], []
         for i, row in enumerate(rows):
             if not isinstance(row, dict):
                 errors.append({"row": i, "error": "Student record must be an object"})
@@ -169,12 +170,25 @@ def ingest_csv():
                                 row[numeric_field] = float(row[numeric_field])
                             except (TypeError, ValueError) as error:
                                 raise ValueError(f"{numeric_field} must be a number") from error
-                db.upsert_student(row, scope=scope or None)
-                inserted += 1
+                db.validate_student(row)
+                prepared_docs.append(row)
+                prepared_rows.append(i)
             except PermissionError as error:
                 errors.append({"row": i, "error": str(error)})
             except ValueError as error:
                 errors.append({"row": i, "error": str(error)})
+
+        inserted = 0
+        if prepared_docs:
+            inserted, bulk_errors = db.bulk_upsert_students(
+                prepared_docs,
+                scope=scope or None,
+            )
+            errors.extend(
+                {"row": prepared_rows[index], "error": message}
+                for index, message in bulk_errors
+            )
+        errors.sort(key=lambda error: error["row"])
         return inserted, skipped, errors
 
     def rows_from_payload(payload):
