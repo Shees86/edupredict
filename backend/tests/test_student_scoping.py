@@ -80,7 +80,11 @@ class StudentScopingTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         get_student.assert_called_once_with("s1", scope=scope)
 
-    @patch("blueprints.students.db.delete_student", return_value=True)
+    @patch("blueprints.students.db.delete_student", return_value={
+        "predictions": 2,
+        "alerts": 1,
+        "goals": 1,
+    })
     @patch("blueprints.students.db.student_scope_for_user")
     def test_teacher_delete_uses_assigned_scope(self, get_scope, delete_student):
         scope = {"school_id": "school-a", "class_id": "class-7"}
@@ -90,6 +94,14 @@ class StudentScopingTests(unittest.TestCase):
         response = self.client.delete("/api/students/s1")
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {
+            "message": "Deleted",
+            "related_documents_deleted": {
+                "predictions": 2,
+                "alerts": 1,
+                "goals": 1,
+            },
+        })
         delete_student.assert_called_once_with("s1", scope=scope)
 
     @patch("blueprints.students.db.delete_student", side_effect=PermissionError("outside scope"))
@@ -233,24 +245,44 @@ class StudentScopingTests(unittest.TestCase):
         delete_one.return_value.deleted_count = 1
         scope = {"school_id": "school-a", "class_id": "class-7"}
 
-        deleted = db.delete_student("s1", scope=scope)
+        with patch("db.predictions_col.delete_many") as delete_predictions, \
+                patch("db.alerts_col.delete_many") as delete_alerts, \
+                patch("db.goals_col.delete_many") as delete_goals:
+            delete_predictions.return_value.deleted_count = 2
+            delete_alerts.return_value.deleted_count = 3
+            delete_goals.return_value.deleted_count = 1
 
-        self.assertTrue(deleted)
+            deleted = db.delete_student("s1", scope=scope)
+
+        self.assertEqual(deleted, {
+            "predictions": 2,
+            "alerts": 3,
+            "goals": 1,
+        })
         delete_one.assert_called_once_with({"student_id": "s1", **scope})
         find_one.assert_not_called()
+        delete_predictions.assert_called_once_with({"student_id": "s1"})
+        delete_alerts.assert_called_once_with({"student_id": "s1"})
+        delete_goals.assert_called_once_with({"student_id": "s1"})
 
     @patch("db.students_col.find_one", return_value={"student_id": "s1"})
     @patch("db.students_col.delete_one")
     def test_scoped_delete_rejects_student_outside_class(self, delete_one, find_one):
         delete_one.return_value.deleted_count = 0
 
-        with self.assertRaises(PermissionError):
-            db.delete_student(
-                "s1",
-                scope={"school_id": "school-a", "class_id": "class-7"},
-            )
+        with patch("db.predictions_col.delete_many") as delete_predictions, \
+                patch("db.alerts_col.delete_many") as delete_alerts, \
+                patch("db.goals_col.delete_many") as delete_goals:
+            with self.assertRaises(PermissionError):
+                db.delete_student(
+                    "s1",
+                    scope={"school_id": "school-a", "class_id": "class-7"},
+                )
 
         find_one.assert_called_once_with({"student_id": "s1"}, {"_id": 1})
+        delete_predictions.assert_not_called()
+        delete_alerts.assert_not_called()
+        delete_goals.assert_not_called()
 
     @patch("db.students_col.find_one", return_value=None)
     @patch("db.students_col.delete_one")
