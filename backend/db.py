@@ -5,8 +5,8 @@ import secrets
 import hashlib
 from datetime import datetime, timedelta
 from cryptography.fernet import Fernet, InvalidToken
-from pymongo import MongoClient
-from pymongo.errors import DuplicateKeyError
+from pymongo import MongoClient, UpdateOne
+from pymongo.errors import BulkWriteError, DuplicateKeyError
 from werkzeug.security import generate_password_hash, check_password_hash
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017/")
 DB_NAME = os.environ.get("MONGO_DB_NAME", "edupredict")
@@ -236,7 +236,7 @@ def student_scope_for_user(username, role):
     return scope
 
 
-def upsert_student(student_doc, scope=None):
+def validate_student(student_doc):
     if not isinstance(student_doc, dict):
         raise ValueError("Student record must be an object")
 
@@ -263,6 +263,11 @@ def upsert_student(student_doc, scope=None):
         elif not isinstance(value, expected_type):
             raise ValueError(f"{field} must be a string")
 
+
+def upsert_student(student_doc, scope=None):
+    validate_student(student_doc)
+
+    student_id = student_doc["student_id"]
     query = {"student_id": student_id}
     if scope:
         query.update(scope)
@@ -272,6 +277,55 @@ def upsert_student(student_doc, scope=None):
         if scope:
             raise PermissionError("Student is outside your assigned class or school") from error
         raise
+
+
+def bulk_upsert_students(student_docs, scope=None):
+    for student_doc in student_docs:
+        validate_student(student_doc)
+
+    inserted = 0
+    errors = []
+    for batch_start in range(0, len(student_docs), 1000):
+        batch = student_docs[batch_start:batch_start + 1000]
+        operations = []
+        for student_doc in batch:
+            query = {"student_id": student_doc["student_id"]}
+            if scope:
+                query.update(scope)
+            operations.append(UpdateOne(
+                query,
+                {"$set": student_doc},
+                upsert=True,
+            ))
+
+        try:
+            result = students_col.bulk_write(operations, ordered=False)
+        except BulkWriteError as error:
+            details = error.details or {}
+            write_errors = details.get("writeErrors", [])
+            scoped_duplicate_errors = [
+                write_error for write_error in write_errors
+                if scope and write_error.get("code") == 11000
+            ]
+            if (
+                not scope
+                or len(scoped_duplicate_errors) != len(write_errors)
+                or details.get("writeConcernErrors")
+            ):
+                raise
+
+            inserted += details.get("nMatched", 0) + details.get("nUpserted", 0)
+            errors.extend(
+                (
+                    batch_start + write_error["index"],
+                    "Student is outside your assigned class or school",
+                )
+                for write_error in scoped_duplicate_errors
+            )
+        else:
+            inserted += result.matched_count + result.upserted_count
+
+    return inserted, errors
 
 
 def get_student(student_id, scope=None):
