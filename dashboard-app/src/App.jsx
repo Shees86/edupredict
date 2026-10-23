@@ -46,8 +46,12 @@ export default function App() {
         }
       })
       .finally(() => {
-        if (active) setIsSessionLoading(false);
+        if (active) {
+          setIsSessionLoading(false);
+          window.dispatchEvent(new Event("ep:initial-auth-settled"));
+        }
       });
+    window.dispatchEvent(new Event("ep:app-mounted"));
 
     return () => {
       active = false;

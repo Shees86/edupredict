@@ -6,9 +6,124 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="EduPredict predicts student dropout risk, recommends academic pathways, and gives admins, teachers, students, and analysts the data they need — built on Hadoop, PySpark, Flask, MongoDB, and React." />
     <title>EduPredict</title>
+    <style>
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: grid;
+        place-items: center;
+        background: oklch(0.152 0.004 110);
+        color: oklch(0.945 0.006 100);
+        font-family: ui-sans-serif, system-ui, sans-serif;
+      }
+      .splash-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.25rem;
+        padding: 1.5rem;
+        text-align: center;
+      }
+      .splash-wordmark {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 1.5rem;
+        font-weight: 600;
+        letter-spacing: -0.04em;
+      }
+      .splash-wordmark span {
+        color: oklch(0.905 0.166 118);
+      }
+      .splash-mark {
+        display: flex;
+        width: 2rem;
+        height: 2rem;
+        align-items: end;
+        justify-content: center;
+        gap: 0.2rem;
+        padding: 0.4rem;
+        border-radius: 0.6rem;
+        background: oklch(0.905 0.166 118);
+      }
+      .splash-mark i {
+        width: 0.2rem;
+        border-radius: 1rem;
+        background: oklch(0.175 0.02 120);
+      }
+      .splash-mark i:nth-child(1) { height: 0.45rem; opacity: 0.55; }
+      .splash-mark i:nth-child(2) { height: 0.7rem; opacity: 0.78; }
+      .splash-mark i:nth-child(3) { height: 1rem; }
+      .splash-spinner {
+        width: 1.5rem;
+        height: 1.5rem;
+        border: 2px solid oklch(0.905 0.166 118 / 25%);
+        border-top-color: oklch(0.905 0.166 118);
+        border-radius: 50%;
+        animation: splash-spin 0.8s linear infinite;
+      }
+      .splash-message {
+        max-width: 24rem;
+        min-height: 1.25rem;
+        color: oklch(0.66 0.01 100);
+        font-size: 0.875rem;
+      }
+      @keyframes splash-spin {
+        to { transform: rotate(360deg); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .splash-spinner { animation-duration: 1.8s; }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash" role="status" aria-live="polite">
+      <div class="splash-content">
+        <div class="splash-wordmark">
+          <div class="splash-mark" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div>Edu<span>Predict</span></div>
+        </div>
+        <div class="splash-spinner" aria-hidden="true"></div>
+        <div class="splash-message" id="splash-message"></div>
+      </div>
+    </div>
     <div id="root"></div>
+    <script>
+      (() => {
+        let splash = document.getElementById("splash");
+        let appMounted = false;
+        let authSettled = false;
+
+        const hideWhenReady = () => {
+          if (appMounted && authSettled && splash) {
+            splash.remove();
+            splash = null;
+          }
+        };
+
+        window.addEventListener("ep:app-mounted", () => {
+          appMounted = true;
+          hideWhenReady();
+        }, { once: true });
+        window.addEventListener("ep:initial-auth-settled", () => {
+          authSettled = true;
+          hideWhenReady();
+        }, { once: true });
+        window.setTimeout(() => {
+          if (!authSettled && splash && splash.isConnected) {
+            document.getElementById("splash-message").textContent =
+              "Waking up the server — this can take up to a minute.";
+          }
+        }, 4000);
+        window.setTimeout(() => {
+          if (splash) {
+            splash.remove();
+            splash = null;
+          }
+        }, 60000);
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
