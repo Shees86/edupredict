@@ -7,3 +7,7 @@ __pycache__/
 *.log
 .playwright-mcp/
 qa/
+brag-output/
+
+.playwright-mcp/
+qa/
